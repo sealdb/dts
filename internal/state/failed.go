@@ -36,3 +36,7 @@ func (s *FailedState) Next() State {
 func (s *FailedState) CanTransition() bool {
 	return false
 }
+
+
+
+

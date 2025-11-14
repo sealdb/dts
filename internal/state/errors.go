@@ -18,3 +18,7 @@ var (
 	// ErrTaskFailed 任务失败
 	ErrTaskFailed = errors.New("task failed")
 )
+
+
+
+

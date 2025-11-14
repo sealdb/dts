@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pg/dts/internal/logger"
 	"github.com/pg/dts/internal/model"
 	"github.com/pg/dts/internal/repository"
 	"github.com/pg/dts/internal/service"
@@ -46,8 +47,11 @@ type CreateTaskResponse struct {
 // CreateTask 启动数据同步任务
 // POST /rdscheduler/api/tasks
 func (h *TaskHandler) CreateTask(c *gin.Context) {
+	log := logger.GetLogger()
+	
 	var req CreateTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.WithError(err).Warn("Failed to bind request JSON")
 		c.JSON(http.StatusBadRequest, CreateTaskResponse{
 			State:   "ERROR",
 			Message: "Invalid request body: " + err.Error(),
@@ -55,31 +59,40 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		return
 	}
 
+	log.WithFields(map[string]interface{}{
+		"task_id": req.TaskID,
+		"source":  fmt.Sprintf("%s:%s", req.Source.Domin, req.Source.Port),
+		"dest":    fmt.Sprintf("%s:%s", req.Dest.Domin, req.Dest.Port),
+		"tables":  len(req.Tables),
+	}).Info("Creating migration task")
+
 	// 转换请求格式为内部格式
-	sourceDB := model.DBConfig{
+    sourceDB := model.DBConfig{
 		Host:     req.Source.Domin, // 注意：API 规范中使用 "domin" 而不是 "domain"
 		Port:     parseInt(req.Source.Port, 5432),
 		User:     req.Source.Username,
 		Password: req.Source.Password,
-		DBName:   getStringOrDefault(req.Source.Database, req.Source.Username),
+        DBName:   getStringOrDefault(req.Source.Database, "postgres"),
 		SSLMode:  "disable",
 	}
 
-	targetDB := model.DBConfig{
+    targetDB := model.DBConfig{
 		Host:     req.Dest.Domin, // 注意：API 规范中使用 "domin" 而不是 "domain"
 		Port:     parseInt(req.Dest.Port, 5432),
 		User:     req.Dest.Username,
 		Password: req.Dest.Password,
-		DBName:   getStringOrDefault(req.Dest.Database, req.Dest.Username),
+        DBName:   getStringOrDefault(req.Dest.Database, "postgres"),
 		SSLMode:  "disable",
 	}
 
 	// 如果没有指定表，则从源库获取所有表
 	tables := req.Tables
 	if len(tables) == 0 {
+		log.Info("No tables specified, fetching all tables from source database")
 		// 从源库获取所有表
 		sourceRepo, err := repository.NewSourceRepository(sourceDB.DSN())
 		if err != nil {
+			log.WithError(err).Error("Failed to connect to source database")
 			c.JSON(http.StatusInternalServerError, CreateTaskResponse{
 				State:   "ERROR",
 				Message: "Failed to connect to source database: " + err.Error(),
@@ -91,6 +104,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		// 获取所有表（从 public schema）
 		allTables, err := sourceRepo.GetAllTables("public")
 		if err != nil {
+			log.WithError(err).Error("Failed to get tables from source database")
 			c.JSON(http.StatusInternalServerError, CreateTaskResponse{
 				State:   "ERROR",
 				Message: "Failed to get tables from source database: " + err.Error(),
@@ -99,6 +113,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		}
 
 		if len(allTables) == 0 {
+			log.Warn("No tables found in source database")
 			c.JSON(http.StatusBadRequest, CreateTaskResponse{
 				State:   "ERROR",
 				Message: "No tables found in source database. Please specify tables manually.",
@@ -106,6 +121,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 			return
 		}
 
+		log.WithField("table_count", len(allTables)).Info("Found tables in source database")
 		tables = allTables
 	}
 
@@ -119,6 +135,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 
 	task, err := h.service.CreateTaskWithID(req.TaskID, createReq)
 	if err != nil {
+		log.WithError(err).Error("Failed to create task")
 		c.JSON(http.StatusInternalServerError, CreateTaskResponse{
 			State:   "ERROR",
 			Message: "Failed to create task: " + err.Error(),
@@ -126,8 +143,11 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		return
 	}
 
+	log.WithField("task_id", task.ID).Info("Task created successfully, starting task")
+
 	// 自动启动任务
 	if err := h.service.StartTask(c.Request.Context(), task.ID); err != nil {
+		log.WithError(err).Error("Failed to start task")
 		c.JSON(http.StatusInternalServerError, CreateTaskResponse{
 			State:   "ERROR",
 			Message: "Failed to start task: " + err.Error(),
@@ -135,6 +155,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		return
 	}
 
+	log.WithField("task_id", task.ID).Info("Task started successfully")
 	c.JSON(http.StatusOK, CreateTaskResponse{
 		State:   "OK",
 		Message: "Task created and started successfully",

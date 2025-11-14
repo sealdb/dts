@@ -160,9 +160,9 @@ func setDefaults(config *Config) {
 	if config.Database.Password == "" {
 		config.Database.Password = "postgres"
 	}
-	if config.Database.DBName == "" {
-		config.Database.DBName = "dts_meta"
-	}
+    if config.Database.DBName == "" {
+        config.Database.DBName = "postgres"
+    }
 	if config.Database.SSLMode == "" {
 		config.Database.SSLMode = "disable"
 	}

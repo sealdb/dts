@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pg/dts/internal/logger"
 	"github.com/pg/dts/internal/model"
 	"github.com/pg/dts/internal/repository"
 	"github.com/pg/dts/internal/state"
@@ -122,20 +123,28 @@ func (s *MigrationService) ListTasks(limit, offset int) ([]*model.MigrationTask,
 
 // StartTask 启动任务
 func (s *MigrationService) StartTask(ctx context.Context, id string) error {
+	log := logger.GetLogger()
+	log.WithField("task_id", id).Info("Starting migration task")
+
 	task, err := s.taskRepo.GetByID(id)
 	if err != nil {
+		log.WithError(err).Error("Failed to get task")
 		return err
 	}
 
 	// 检查任务状态
 	currentState := model.StateType(task.State)
 	if currentState.IsTerminal() {
-		return fmt.Errorf("task is in terminal state: %s", currentState)
+		err := fmt.Errorf("task is in terminal state: %s", currentState)
+		log.WithError(err).Warn("Cannot start task")
+		return err
 	}
 
 	// 检查任务是否已在运行
 	if _, exists := s.taskManager.GetTask(id); exists {
-		return fmt.Errorf("task %s is already running", id)
+		err := fmt.Errorf("task %s is already running", id)
+		log.WithError(err).Warn("Task already running")
+		return err
 	}
 
 	// 确保任务连接池已初始化
@@ -145,17 +154,21 @@ func (s *MigrationService) StartTask(ctx context.Context, id string) error {
 
 	// 添加到任务管理器
 	s.taskManager.AddTask(task)
+	log.WithField("task_id", id).Info("Task added to task manager")
 
 	// 创建状态机
 	sm := state.NewStateMachine(task)
 
 	// 执行状态机
 	go func() {
+		log := logger.GetLogger()
+		log.WithField("task_id", id).Info("State machine goroutine started")
 		// 确保任务完成后清理连接
 		defer func() {
+			log.WithField("task_id", id).Info("Cleaning up task")
 			if err := s.taskManager.RemoveTask(id); err != nil {
 				// 记录清理错误，但不影响任务状态
-				fmt.Printf("Warning: failed to cleanup task %s: %v\n", id, err)
+				log.WithError(err).Warn("Failed to cleanup task")
 			}
 		}()
 
@@ -164,9 +177,24 @@ func (s *MigrationService) StartTask(ctx context.Context, id string) error {
 		baseDelayMs := 500
 
 		for {
+			// 获取当前状态
+			currentState := sm.GetCurrentState()
+			if currentState != nil {
+				log.WithFields(map[string]interface{}{
+					"task_id": id,
+					"state":   currentState.Name(),
+				}).Info("Executing state")
+			}
+
 			// 执行当前状态，带重试
 			var execErr error
 			for attempt := 0; attempt <= maxRetries; attempt++ {
+				if attempt > 0 {
+					log.WithFields(map[string]interface{}{
+						"task_id": id,
+						"attempt": attempt,
+					}).Warn("Retrying state execution")
+				}
 				execErr = sm.Execute(ctx)
 				if execErr == nil {
 					break
@@ -178,6 +206,7 @@ func (s *MigrationService) StartTask(ctx context.Context, id string) error {
 				// 简单 sleep（避免引入额外依赖）
 				select {
 				case <-ctx.Done():
+					log.WithField("task_id", id).Warn("Context cancelled")
 					s.taskRepo.UpdateState(task.ID, model.StateFailed, ctx.Err().Error())
 					return
 				case <-time.After(time.Duration(delay) * time.Millisecond):
@@ -186,6 +215,7 @@ func (s *MigrationService) StartTask(ctx context.Context, id string) error {
 
 			if execErr != nil {
 				// 更新任务为失败状态
+				log.WithError(execErr).WithField("task_id", id).Error("State execution failed")
 				s.taskRepo.UpdateState(task.ID, model.StateFailed, execErr.Error())
 				// 失败时清理连接
 				task.CloseAllConnections()
@@ -193,9 +223,13 @@ func (s *MigrationService) StartTask(ctx context.Context, id string) error {
 			}
 
 			// 更新任务状态
-			currentState := sm.GetCurrentState()
+			currentState = sm.GetCurrentState()
 			if currentState != nil {
 				newState := model.StateType(currentState.Name())
+				log.WithFields(map[string]interface{}{
+					"task_id": id,
+					"new_state": newState.String(),
+				}).Info("State transition completed")
 				s.taskRepo.UpdateState(task.ID, newState, "")
 				// 粗粒度进度：按状态推进
 				s.taskRepo.UpdateProgress(task.ID, progressForState(newState))
@@ -203,6 +237,10 @@ func (s *MigrationService) StartTask(ctx context.Context, id string) error {
 
 			// 检查是否到达终止状态
 			if task.State == model.StateCompleted.String() || task.State == model.StateFailed.String() {
+				log.WithFields(map[string]interface{}{
+					"task_id": id,
+					"final_state": task.State,
+				}).Info("Task reached terminal state")
 				// 任务完成，清理连接（defer 也会执行，但这里显式调用确保清理）
 				task.CloseAllConnections()
 				return
