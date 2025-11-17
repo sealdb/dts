@@ -201,5 +201,5 @@ GET /api/v1/health
 
 ## License
 
-MIT
+Apache 2.0
 
