@@ -6,20 +6,20 @@ import (
 	"github.com/jackc/pglogrepl"
 )
 
-// Decoder WAL 解码器
+// Decoder decodes WAL messages
 type Decoder struct {
 	plugin string
 }
 
-// NewDecoder 创建解码器
+// NewDecoder creates a decoder
 func NewDecoder(plugin string) *Decoder {
 	if plugin == "" {
-		plugin = "pgoutput" // 默认使用 pgoutput
+		plugin = "pgoutput" // Default to pgoutput
 	}
 	return &Decoder{plugin: plugin}
 }
 
-// Decode 解码 WAL 消息
+// Decode decodes WAL messages
 func (d *Decoder) Decode(msg pglogrepl.Message) (Message, error) {
 	switch v := msg.(type) {
 	case *pglogrepl.RelationMessage:
@@ -75,7 +75,7 @@ func (d *Decoder) Decode(msg pglogrepl.Message) (Message, error) {
 	}
 }
 
-// convertColumns 转换列信息
+// convertColumns converts column information
 func convertColumns(cols []*pglogrepl.RelationMessageColumn) []Column {
 	result := make([]Column, len(cols))
 	for i, col := range cols {
@@ -89,7 +89,7 @@ func convertColumns(cols []*pglogrepl.RelationMessageColumn) []Column {
 	return result
 }
 
-// convertTuple 转换元组
+// convertTuple converts tuple
 func convertTuple(tuple *pglogrepl.TupleData) *Tuple {
 	if tuple == nil {
 		return nil
@@ -100,10 +100,10 @@ func convertTuple(tuple *pglogrepl.TupleData) *Tuple {
 	}
 
 	for i, col := range tuple.Columns {
-		// 注意：新版本的 pglogrepl 中，TupleDataColumn 可能没有 Kind 字段
-		// 使用 DataType 来判断类型
+		// Note: In newer versions of pglogrepl, TupleDataColumn may not have Kind field
+		// Use DataType to determine type
 		result.Columns[i] = TupleColumn{
-			Kind:     0, // 如果 Kind 不存在，使用 0 或根据 DataType 推断
+			Kind:     0, // If Kind doesn't exist, use 0 or infer from DataType
 			DataType: int(col.DataType),
 			Length:   int(col.Length),
 			Data:     col.Data,
@@ -113,7 +113,7 @@ func convertTuple(tuple *pglogrepl.TupleData) *Tuple {
 	return result
 }
 
-// convertRelationIDs 转换关系ID列表
+// convertRelationIDs converts relation ID list
 func convertRelationIDs(ids []uint32) []int {
 	result := make([]int, len(ids))
 	for i, id := range ids {

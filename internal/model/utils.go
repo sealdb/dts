@@ -6,12 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// generateUUID 生成UUID
+// generateUUID generates a UUID
 func generateUUID() string {
 	return uuid.New().String()
 }
 
-// StateType 状态类型
+// StateType represents state type
 type StateType string
 
 const (
@@ -27,19 +27,19 @@ const (
 	StatePaused         StateType = "paused"
 )
 
-// String 返回状态的字符串表示
+// String returns the string representation of the state
 func (s StateType) String() string {
 	return string(s)
 }
 
-// IsTerminal 判断是否为终止状态
+// IsTerminal checks if the state is terminal
 func (s StateType) IsTerminal() bool {
 	return s == StateCompleted || s == StateFailed
 }
 
-// CanTransition 判断是否可以转换到目标状态
+// CanTransition checks if can transition to target state
 func (s StateType) CanTransition(target StateType) bool {
-	// 定义状态转换规则
+	// Define state transition rules
 	transitions := map[StateType][]StateType{
 		StateInit:           {StateCreatingTables, StateFailed},
 		StateCreatingTables: {StateMigratingData, StateFailed, StatePaused},
@@ -65,19 +65,19 @@ func (s StateType) CanTransition(target StateType) bool {
 	return false
 }
 
-// GetStateDisplayName 获取状态的显示名称
+// GetStateDisplayName gets the display name of the state
 func GetStateDisplayName(state StateType) string {
 	names := map[StateType]string{
-		StateInit:           "初始化",
-		StateCreatingTables: "创建目标表",
-		StateMigratingData:  "迁移数据",
-		StateSyncingWAL:     "同步WAL日志",
-		StateStoppingWrites: "停止源库写操作",
-		StateValidating:     "数据校验",
-		StateFinalizing:     "完成迁移",
-		StateCompleted:      "已完成",
-		StateFailed:         "失败",
-		StatePaused:         "已暂停",
+		StateInit:           "Initializing",
+		StateCreatingTables: "Creating target tables",
+		StateMigratingData:  "Migrating data",
+		StateSyncingWAL:     "Syncing WAL logs",
+		StateStoppingWrites: "Stopping source database writes",
+		StateValidating:     "Validating data",
+		StateFinalizing:     "Finalizing migration",
+		StateCompleted:      "Completed",
+		StateFailed:         "Failed",
+		StatePaused:         "Paused",
 	}
 
 	if name, ok := names[state]; ok {
@@ -86,7 +86,7 @@ func GetStateDisplayName(state StateType) string {
 	return string(state)
 }
 
-// UpdateTaskState 更新任务状态
+// UpdateTaskState updates task state
 func UpdateTaskState(task *MigrationTask, newState StateType, errorMsg string) {
 	task.State = newState.String()
 	if errorMsg != "" {

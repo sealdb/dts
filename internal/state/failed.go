@@ -6,37 +6,33 @@ import (
 	"github.com/pg/dts/internal/model"
 )
 
-// FailedState 失败状态
+// FailedState represents the failed state
 type FailedState struct {
 	BaseState
 }
 
-// NewFailedState 创建失败状态
+// NewFailedState creates a new failed state
 func NewFailedState() *FailedState {
 	return &FailedState{
 		BaseState: BaseState{name: model.StateFailed.String()},
 	}
 }
 
-// Execute 执行失败状态逻辑
+// Execute executes the failed state logic
 func (s *FailedState) Execute(ctx context.Context, task *model.MigrationTask) error {
-	// TODO: 实现失败处理逻辑
-	// 1. 清理资源（复制槽、Publication等）
-	// 2. 记录错误信息
+	// TODO: Implement failure handling logic
+	// 1. Clean up resources (replication slots, publications, etc.)
+	// 2. Record error information
 
 	return nil
 }
 
-// Next 返回下一个状态（失败状态是终止状态）
+// Next returns the next state (failed state is a terminal state)
 func (s *FailedState) Next() State {
 	return nil
 }
 
-// CanTransition 失败状态不能转换
+// CanTransition returns whether the failed state can transition (it cannot)
 func (s *FailedState) CanTransition() bool {
 	return false
 }
-
-
-
-

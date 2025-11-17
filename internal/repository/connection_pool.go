@@ -8,31 +8,31 @@ import (
 	"gorm.io/gorm"
 )
 
-// GetOrCreateGORMConnection 获取或创建 GORM 数据库连接（带连接池管理）
+// GetOrCreateGORMConnection gets or creates GORM database connection (with connection pool management)
 func GetOrCreateGORMConnection(task *model.MigrationTask, dbConfig *model.DBConfig) (*gorm.DB, error) {
 	connectionKey := dbConfig.ConnectionKey()
 
-	// 尝试从任务中获取已有连接
+	// Try to get existing connection from task
 	if conn, ok := task.GetConnection(connectionKey); ok {
 		if gormDB, ok := conn.(*gorm.DB); ok {
-			// 验证连接是否仍然有效
+			// Verify connection is still valid
 			sqlDB, err := gormDB.DB()
 			if err == nil {
 				if err := sqlDB.Ping(); err == nil {
 					return gormDB, nil
 				}
 			}
-			// 连接无效，需要重新创建
+			// Connection invalid, need to recreate
 		}
 	}
 
-	// 创建新连接
+	// Create new connection
 	db, err := gorm.Open(postgres.Open(dbConfig.DSN()), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	// 设置连接池参数
+	// Set connection pool parameters
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
@@ -41,19 +41,19 @@ func GetOrCreateGORMConnection(task *model.MigrationTask, dbConfig *model.DBConf
 	sqlDB.SetMaxOpenConns(10)
 	sqlDB.SetMaxIdleConns(5)
 
-	// 验证连接
+	// Verify connection
 	if err := sqlDB.Ping(); err != nil {
 		sqlDB.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// 将连接添加到任务连接池
+	// Add connection to task connection pool
 	task.AddConnection(connectionKey, db)
 
 	return db, nil
 }
 
-// GetOrCreateSourceGORMConnection 获取或创建源库 GORM 连接
+// GetOrCreateSourceGORMConnection gets or creates source database GORM connection
 func GetOrCreateSourceGORMConnection(task *model.MigrationTask) (*gorm.DB, error) {
 	sourceDB, err := ParseSourceDB(task)
 	if err != nil {
@@ -63,7 +63,7 @@ func GetOrCreateSourceGORMConnection(task *model.MigrationTask) (*gorm.DB, error
 	return GetOrCreateGORMConnection(task, sourceDB)
 }
 
-// GetOrCreateTargetGORMConnection 获取或创建目标库 GORM 连接
+// GetOrCreateTargetGORMConnection gets or creates target database GORM connection
 func GetOrCreateTargetGORMConnection(task *model.MigrationTask) (*gorm.DB, error) {
 	targetDB, err := ParseTargetDB(task)
 	if err != nil {
@@ -73,14 +73,14 @@ func GetOrCreateTargetGORMConnection(task *model.MigrationTask) (*gorm.DB, error
 	return GetOrCreateGORMConnection(task, targetDB)
 }
 
-// GetOrCreateSourceConnection 获取或创建源库连接（兼容旧接口，返回 sql.DB）
-// 注意：此方法主要用于需要 pgx 原生 API 的场景（如 COPY FROM STDIN）
+// GetOrCreateSourceConnection gets or creates source database connection (compatible with old interface, returns sql.DB)
+// Note: This method is mainly used for scenarios requiring pgx native API (such as COPY FROM STDIN)
 func GetOrCreateSourceConnection(task *model.MigrationTask) (*gorm.DB, error) {
 	return GetOrCreateSourceGORMConnection(task)
 }
 
-// GetOrCreateTargetConnection 获取或创建目标库连接（兼容旧接口，返回 sql.DB）
-// 注意：此方法主要用于需要 pgx 原生 API 的场景（如 COPY FROM STDIN）
+// GetOrCreateTargetConnection gets or creates target database connection (compatible with old interface, returns sql.DB)
+// Note: This method is mainly used for scenarios requiring pgx native API (such as COPY FROM STDIN)
 func GetOrCreateTargetConnection(task *model.MigrationTask) (*gorm.DB, error) {
 	return GetOrCreateTargetGORMConnection(task)
 }

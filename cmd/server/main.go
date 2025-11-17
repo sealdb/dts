@@ -18,14 +18,14 @@ import (
 )
 
 var (
-	// 版本信息（编译时注入）
+	// Version information (injected at build time)
 	Version   = "dev"
 	BuildTime = "unknown"
 	GitCommit = "unknown"
 )
 
 func main() {
-	// 加载配置（支持命令行参数，会解析所有 flag）
+	// Load configuration (supports command line arguments, will parse all flags)
 	cfg, flags, err := config.LoadWithFlags("configs/config.yaml")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
@@ -33,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 检查版本参数
+	// Check version flag
 	if flags.ShowVersion {
 		fmt.Printf("Version: %s\n", Version)
 		fmt.Printf("Build Time: %s\n", BuildTime)
@@ -41,7 +41,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	// 初始化日志
+	// Initialize logger
 	if err := logger.Init(&cfg.Log); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
 		os.Exit(1)
@@ -54,7 +54,7 @@ func main() {
 		"gitCommit": GitCommit,
 	}).Info("Starting DTS server")
 
-	// 连接元数据库（用于存储任务信息）
+	// Connect to metadata database (for storing task information)
 	log.WithFields(logrus.Fields{
 		"host": cfg.Database.Host,
 		"port": cfg.Database.Port,
@@ -66,34 +66,34 @@ func main() {
 		log.WithError(err).Fatal("Failed to connect to metadata database")
 	}
 
-	// 自动迁移表结构
+	// Auto migrate table structure
 	log.Info("Running database migrations")
 	if err := db.AutoMigrate(&model.MigrationTask{}); err != nil {
 		log.WithError(err).Fatal("Failed to migrate database")
 	}
 	log.Info("Database migrations completed")
 
-	// 创建服务
+	// Create service
 	migrationService := service.NewMigrationService(db)
 
-	// 设置 Gin 模式
+	// Set Gin mode
 	if log.GetLevel() == logrus.DebugLevel {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// 设置 Gin 路由
+	// Set up Gin routes
 	router := gin.New()
 
-	// 添加中间件
+	// Add middleware
 	router.Use(ginLogger(log))
 	router.Use(gin.Recovery())
 
-	// 设置路由
+	// Set up routes
 	api.SetupRoutes(router, migrationService)
 
-	// 启动定期清理已完成任务的 goroutine
+	// Start goroutine to periodically clean up completed tasks
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
@@ -105,7 +105,7 @@ func main() {
 		}
 	}()
 
-	// 启动服务器
+	// Start server
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	log.WithFields(logrus.Fields{
 		"host": cfg.Server.Host,
@@ -126,17 +126,17 @@ func main() {
 	}
 }
 
-// ginLogger 自定义 Gin 日志中间件
+// ginLogger is a custom Gin logging middleware
 func ginLogger(log *logrus.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
 		raw := c.Request.URL.RawQuery
 
-		// 处理请求
+		// Process request
 		c.Next()
 
-		// 记录日志
+		// Log request
 		latency := time.Since(start)
 		clientIP := c.ClientIP()
 		method := c.Request.Method

@@ -8,22 +8,22 @@ import (
 	"gorm.io/gorm"
 )
 
-// MigrationRepository 迁移任务仓储
+// MigrationRepository manages migration tasks
 type MigrationRepository struct {
 	db *gorm.DB
 }
 
-// NewMigrationRepository 创建迁移任务仓储
+// NewMigrationRepository creates a migration task repository
 func NewMigrationRepository(db *gorm.DB) *MigrationRepository {
 	return &MigrationRepository{db: db}
 }
 
-// Create 创建迁移任务
+// Create creates a migration task
 func (r *MigrationRepository) Create(task *model.MigrationTask) error {
 	return r.db.Create(task).Error
 }
 
-// GetByID 根据ID获取任务
+// GetByID gets task by ID
 func (r *MigrationRepository) GetByID(id string) (*model.MigrationTask, error) {
 	var task model.MigrationTask
 	if err := r.db.Where("id = ?", id).First(&task).Error; err != nil {
@@ -32,19 +32,19 @@ func (r *MigrationRepository) GetByID(id string) (*model.MigrationTask, error) {
 	return &task, nil
 }
 
-// List 获取任务列表
+// List gets task list
 func (r *MigrationRepository) List(limit, offset int) ([]*model.MigrationTask, error) {
 	var tasks []*model.MigrationTask
 	err := r.db.Order("created_at DESC").Limit(limit).Offset(offset).Find(&tasks).Error
 	return tasks, err
 }
 
-// Update 更新任务
+// Update updates a task
 func (r *MigrationRepository) Update(task *model.MigrationTask) error {
 	return r.db.Save(task).Error
 }
 
-// UpdateState 更新任务状态
+// UpdateState updates task state
 func (r *MigrationRepository) UpdateState(id string, state model.StateType, errorMsg string) error {
 	updates := map[string]interface{}{
 		"state": state.String(),
@@ -57,17 +57,17 @@ func (r *MigrationRepository) UpdateState(id string, state model.StateType, erro
 	return r.db.Model(&model.MigrationTask{}).Where("id = ?", id).Updates(updates).Error
 }
 
-// UpdateProgress 更新任务进度
+// UpdateProgress updates task progress
 func (r *MigrationRepository) UpdateProgress(id string, progress int) error {
 	return r.db.Model(&model.MigrationTask{}).Where("id = ?", id).Update("progress", progress).Error
 }
 
-// Delete 删除任务
+// Delete deletes a task
 func (r *MigrationRepository) Delete(id string) error {
 	return r.db.Delete(&model.MigrationTask{}, id).Error
 }
 
-// ParseSourceDB 解析源数据库配置
+// ParseSourceDB parses source database configuration
 func ParseSourceDB(task *model.MigrationTask) (*model.DBConfig, error) {
 	var dbConfig model.DBConfig
 	if err := json.Unmarshal([]byte(task.SourceDB), &dbConfig); err != nil {
@@ -76,7 +76,7 @@ func ParseSourceDB(task *model.MigrationTask) (*model.DBConfig, error) {
 	return &dbConfig, nil
 }
 
-// ParseTargetDB 解析目标数据库配置
+// ParseTargetDB parses target database configuration
 func ParseTargetDB(task *model.MigrationTask) (*model.DBConfig, error) {
 	var dbConfig model.DBConfig
 	if err := json.Unmarshal([]byte(task.TargetDB), &dbConfig); err != nil {
@@ -85,7 +85,7 @@ func ParseTargetDB(task *model.MigrationTask) (*model.DBConfig, error) {
 	return &dbConfig, nil
 }
 
-// ParseTables 解析表列表
+// ParseTables parses table list
 func ParseTables(task *model.MigrationTask) ([]string, error) {
 	var tables []string
 	if err := json.Unmarshal([]byte(task.Tables), &tables); err != nil {

@@ -3,22 +3,18 @@ package state
 import "errors"
 
 var (
-	// ErrInvalidState 无效状态错误
+	// ErrInvalidState indicates an invalid state error
 	ErrInvalidState = errors.New("invalid state")
 
-	// ErrStateTransitionFailed 状态转换失败
+	// ErrStateTransitionFailed indicates a state transition failure
 	ErrStateTransitionFailed = errors.New("state transition failed")
 
-	// ErrTaskNotFound 任务不存在
+	// ErrTaskNotFound indicates the task was not found
 	ErrTaskNotFound = errors.New("task not found")
 
-	// ErrTaskAlreadyCompleted 任务已完成
+	// ErrTaskAlreadyCompleted indicates the task is already completed
 	ErrTaskAlreadyCompleted = errors.New("task already completed")
 
-	// ErrTaskFailed 任务失败
+	// ErrTaskFailed indicates the task has failed
 	ErrTaskFailed = errors.New("task failed")
 )
-
-
-
-

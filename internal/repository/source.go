@@ -9,19 +9,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// SourceRepository 源库操作
+// SourceRepository handles source database operations
 type SourceRepository struct {
 	db *gorm.DB
 }
 
-// NewSourceRepository 创建源库仓储
+// NewSourceRepository creates a source repository
 func NewSourceRepository(dsn string) (*SourceRepository, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to source database: %w", err)
 	}
 
-	// 设置连接池参数
+	// Set connection pool parameters
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
@@ -30,7 +30,7 @@ func NewSourceRepository(dsn string) (*SourceRepository, error) {
 	sqlDB.SetMaxOpenConns(10)
 	sqlDB.SetMaxIdleConns(5)
 
-	// 验证连接
+	// Verify connection
 	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping source database: %w", err)
 	}
@@ -38,7 +38,7 @@ func NewSourceRepository(dsn string) (*SourceRepository, error) {
 	return &SourceRepository{db: db}, nil
 }
 
-// NewSourceRepositoryFromTask 从任务创建源库仓储（使用连接池）
+// NewSourceRepositoryFromTask creates a source repository from task (using connection pool)
 func NewSourceRepositoryFromTask(task *model.MigrationTask) (*SourceRepository, error) {
 	db, err := GetOrCreateSourceGORMConnection(task)
 	if err != nil {
@@ -48,7 +48,7 @@ func NewSourceRepositoryFromTask(task *model.MigrationTask) (*SourceRepository, 
 	return &SourceRepository{db: db}, nil
 }
 
-// Close 关闭连接
+// Close closes the connection
 func (r *SourceRepository) Close() error {
 	sqlDB, err := r.db.DB()
 	if err != nil {
@@ -57,12 +57,12 @@ func (r *SourceRepository) Close() error {
 	return sqlDB.Close()
 }
 
-// GetDB 获取底层 GORM DB（用于特殊操作）
+// GetDB gets the underlying GORM DB (for special operations)
 func (r *SourceRepository) GetDB() *gorm.DB {
 	return r.db
 }
 
-// CheckWALLevel 检查 WAL 级别
+// CheckWALLevel checks WAL level
 func (r *SourceRepository) CheckWALLevel() (string, error) {
 	var walLevel string
 	err := r.db.Raw("SHOW wal_level").Scan(&walLevel).Error
@@ -72,7 +72,7 @@ func (r *SourceRepository) CheckWALLevel() (string, error) {
 	return walLevel, nil
 }
 
-// GetTableInfo 获取表结构信息
+// GetTableInfo gets table structure information
 func (r *SourceRepository) GetTableInfo(schema, tableName string) (*model.TableInfo, error) {
 	tableInfo := &model.TableInfo{
 		Schema:      schema,
@@ -82,28 +82,28 @@ func (r *SourceRepository) GetTableInfo(schema, tableName string) (*model.TableI
 		Constraints: []model.ConstraintInfo{},
 	}
 
-	// 获取列信息
+	// Get column information
 	columns, err := r.getColumns(schema, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get columns: %w", err)
 	}
 	tableInfo.Columns = columns
 
-	// 获取索引信息
+	// Get index information
 	indexes, err := r.getIndexes(schema, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get indexes: %w", err)
 	}
 	tableInfo.Indexes = indexes
 
-	// 获取约束信息
+	// Get constraint information
 	constraints, err := r.getConstraints(schema, tableName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get constraints: %w", err)
 	}
 	tableInfo.Constraints = constraints
 
-	// 生成 DDL
+	// Generate DDL
 	ddl, err := r.generateDDL(tableInfo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate DDL: %w", err)
@@ -113,7 +113,7 @@ func (r *SourceRepository) GetTableInfo(schema, tableName string) (*model.TableI
 	return tableInfo, nil
 }
 
-// getColumns 获取列信息
+// getColumns gets column information
 func (r *SourceRepository) getColumns(schema, tableName string) ([]model.ColumnInfo, error) {
 	query := `
 		SELECT
@@ -167,7 +167,7 @@ func (r *SourceRepository) getColumns(schema, tableName string) ([]model.ColumnI
 	return columns, nil
 }
 
-// getIndexes 获取索引信息
+// getIndexes gets index information
 func (r *SourceRepository) getIndexes(schema, tableName string) ([]model.IndexInfo, error) {
 	query := `
 		SELECT
@@ -204,7 +204,7 @@ func (r *SourceRepository) getIndexes(schema, tableName string) ([]model.IndexIn
 	return indexes, nil
 }
 
-// getConstraints 获取约束信息
+// getConstraints gets constraint information
 func (r *SourceRepository) getConstraints(schema, tableName string) ([]model.ConstraintInfo, error) {
 	query := `
 		SELECT
@@ -258,23 +258,23 @@ func (r *SourceRepository) getConstraints(schema, tableName string) ([]model.Con
 	return constraints, nil
 }
 
-// generateDDL 生成创建表的 DDL
+// generateDDL generates CREATE TABLE DDL
 func (r *SourceRepository) generateDDL(tableInfo *model.TableInfo) (string, error) {
 	var ddl strings.Builder
 
 	ddl.WriteString(fmt.Sprintf("CREATE TABLE %s.%s (\n", tableInfo.Schema, tableInfo.Name))
 
-	// 列定义
+	// Column definitions
 	var columnDefs []string
 	for _, col := range tableInfo.Columns {
 		def := fmt.Sprintf("  %s %s", col.Name, col.DataType)
 
-		// 添加 NOT NULL
+		// Add NOT NULL
 		if !col.IsNullable {
 			def += " NOT NULL"
 		}
 
-		// 添加默认值
+		// Add default value
 		if col.DefaultValue != "" {
 			def += " DEFAULT " + col.DefaultValue
 		}
@@ -282,7 +282,7 @@ func (r *SourceRepository) generateDDL(tableInfo *model.TableInfo) (string, erro
 		columnDefs = append(columnDefs, def)
 	}
 
-	// 添加主键约束
+	// Add primary key constraint
 	var pkColumns []string
 	for _, col := range tableInfo.Columns {
 		if col.IsPrimaryKey {
@@ -299,10 +299,10 @@ func (r *SourceRepository) generateDDL(tableInfo *model.TableInfo) (string, erro
 	return ddl.String(), nil
 }
 
-// extractColumnsFromIndexDef 从索引定义中提取列名
+// extractColumnsFromIndexDef extracts column names from index definition
 func extractColumnsFromIndexDef(indexDef string) []string {
-	// 简单实现：从 CREATE INDEX ... ON table (col1, col2) 中提取列名
-	// 更复杂的实现可以使用 SQL 解析器
+	// Simple implementation: extract column names from CREATE INDEX ... ON table (col1, col2)
+	// More complex implementation can use SQL parser
 	start := strings.Index(indexDef, "(")
 	end := strings.Index(indexDef, ")")
 	if start == -1 || end == -1 {
@@ -315,7 +315,7 @@ func extractColumnsFromIndexDef(indexDef string) []string {
 	var result []string
 	for _, col := range cols {
 		col = strings.TrimSpace(col)
-		// 移除可能的排序方向 (ASC/DESC)
+		// Remove possible sort direction (ASC/DESC)
 		col = strings.TrimSuffix(strings.TrimSuffix(col, " ASC"), " DESC")
 		result = append(result, strings.TrimSpace(col))
 	}
@@ -323,7 +323,7 @@ func extractColumnsFromIndexDef(indexDef string) []string {
 	return result
 }
 
-// parseStringArray 解析逗号分隔的字符串数组
+// parseStringArray parses comma-separated string array
 func parseStringArray(s string) []string {
 	if s == "" {
 		return []string{}
@@ -335,7 +335,7 @@ func parseStringArray(s string) []string {
 	return parts
 }
 
-// GetTableCount 获取表行数
+// GetTableCount gets table row count
 func (r *SourceRepository) GetTableCount(schema, tableName string) (int64, error) {
 	var count int64
 	query := fmt.Sprintf(`SELECT COUNT(*) FROM %s.%s`, schema, tableName)
@@ -346,7 +346,7 @@ func (r *SourceRepository) GetTableCount(schema, tableName string) (int64, error
 	return count, nil
 }
 
-// SetReadOnly 设置数据库为只读
+// SetReadOnly sets database to read-only
 func (r *SourceRepository) SetReadOnly() error {
 	err := r.db.Exec("ALTER DATABASE current_database() SET default_transaction_read_only = true").Error
 	if err != nil {
@@ -355,13 +355,13 @@ func (r *SourceRepository) SetReadOnly() error {
 	return nil
 }
 
-// RevokeWritePermissions 撤销写权限
+// RevokeWritePermissions revokes write permissions
 func (r *SourceRepository) RevokeWritePermissions(schema string, tables []string) error {
-	// TODO: 实现撤销写权限
+	// TODO: Implement revoke write permissions
 	return fmt.Errorf("not implemented")
 }
 
-// RestoreWritePermissions 恢复写权限
+// RestoreWritePermissions restores write permissions
 func (r *SourceRepository) RestoreWritePermissions() error {
 	err := r.db.Exec("ALTER DATABASE current_database() RESET default_transaction_read_only").Error
 	if err != nil {
@@ -370,7 +370,7 @@ func (r *SourceRepository) RestoreWritePermissions() error {
 	return nil
 }
 
-// GetAllTables 获取指定 schema 下的所有表
+// GetAllTables gets all tables under specified schema
 func (r *SourceRepository) GetAllTables(schema string) ([]string, error) {
 	query := `
 		SELECT table_name

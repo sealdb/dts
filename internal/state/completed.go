@@ -6,34 +6,30 @@ import (
 	"github.com/pg/dts/internal/model"
 )
 
-// CompletedState 已完成状态
+// CompletedState represents the completed state
 type CompletedState struct {
 	BaseState
 }
 
-// NewCompletedState 创建已完成状态
+// NewCompletedState creates a new completed state
 func NewCompletedState() *CompletedState {
 	return &CompletedState{
 		BaseState: BaseState{name: model.StateCompleted.String()},
 	}
 }
 
-// Execute 执行完成状态逻辑
+// Execute executes the completed state logic
 func (s *CompletedState) Execute(ctx context.Context, task *model.MigrationTask) error {
-	// 已完成状态不需要执行任何操作
+	// Completed state does not need to perform any operations
 	return nil
 }
 
-// Next 返回下一个状态（已完成状态是终止状态）
+// Next returns the next state (completed state is a terminal state)
 func (s *CompletedState) Next() State {
 	return nil
 }
 
-// CanTransition 已完成状态不能转换
+// CanTransition returns whether the completed state can transition (it cannot)
 func (s *CompletedState) CanTransition() bool {
 	return false
 }
-
-
-
-

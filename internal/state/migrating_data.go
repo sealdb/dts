@@ -8,40 +8,40 @@ import (
 	"github.com/pg/dts/internal/repository"
 )
 
-// MigratingDataState 迁移数据状态
+// MigratingDataState represents the migrating data state
 type MigratingDataState struct {
 	BaseState
 }
 
-// NewMigratingDataState 创建迁移数据状态
+// NewMigratingDataState creates a new migrating data state
 func NewMigratingDataState() *MigratingDataState {
 	return &MigratingDataState{
 		BaseState: BaseState{name: model.StateMigratingData.String()},
 	}
 }
 
-// Execute 执行数据迁移逻辑
+// Execute executes the data migration logic
 func (s *MigratingDataState) Execute(ctx context.Context, task *model.MigrationTask) error {
-	// 解析表列表
+	// Parse table list
 	tables, err := repository.ParseTables(task)
 	if err != nil {
 		return fmt.Errorf("failed to parse tables: %w", err)
 	}
 
-	// 创建仓储（使用连接池）
+	// Create repositories (using connection pool)
 	sourceRepo, err := repository.NewSourceRepositoryFromTask(task)
 	if err != nil {
 		return fmt.Errorf("failed to connect to source database: %w", err)
 	}
-	// 连接由任务管理器统一管理，不在这里关闭
+	// Connections are managed by task manager, don't close here
 
 	targetRepo, err := repository.NewTargetRepositoryFromTask(task)
 	if err != nil {
 		return fmt.Errorf("failed to connect to target database: %w", err)
 	}
-	// 连接由任务管理器统一管理，不在这里关闭
+	// Connections are managed by task manager, don't close here
 
-	// 迁移每个表的数据
+	// Migrate data for each table
 	schema := "public"
 	for i, tableName := range tables {
 		sourceTable := tableName
@@ -51,16 +51,16 @@ func (s *MigratingDataState) Execute(ctx context.Context, task *model.MigrationT
 			return fmt.Errorf("failed to copy data for table %s: %w", tableName, err)
 		}
 
-		// 更新进度（简单实现，实际可以更精确）
+		// Update progress (simple implementation, can be more precise)
 		progress := (i + 1) * 100 / len(tables)
-		// TODO: 更新任务进度到数据库
+		// TODO: Update task progress to database
 		_ = progress
 	}
 
 	return nil
 }
 
-// Next 返回下一个状态
+// Next returns the next state
 func (s *MigratingDataState) Next() State {
 	return NewSyncingWALState()
 }

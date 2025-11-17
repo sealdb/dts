@@ -7,12 +7,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// SlotManager 复制槽管理器
+// SlotManager manages replication slots
 type SlotManager struct {
 	db *gorm.DB
 }
 
-// NewSlotManager 创建复制槽管理器
+// NewSlotManager creates a replication slot manager
 func NewSlotManager(dsn string) (*SlotManager, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -31,12 +31,12 @@ func NewSlotManager(dsn string) (*SlotManager, error) {
 	return &SlotManager{db: db}, nil
 }
 
-// NewSlotManagerFromDB 从已有 GORM 连接创建复制槽管理器
+// NewSlotManagerFromDB creates a replication slot manager from existing GORM connection
 func NewSlotManagerFromDB(db *gorm.DB) (*SlotManager, error) {
 	return &SlotManager{db: db}, nil
 }
 
-// Close 关闭连接（注意：如果使用共享连接，不应该调用此方法）
+// Close closes the connection (note: should not call this method if using shared connection)
 func (sm *SlotManager) Close() error {
 	sqlDB, err := sm.db.DB()
 	if err != nil {
@@ -45,7 +45,7 @@ func (sm *SlotManager) Close() error {
 	return sqlDB.Close()
 }
 
-// CreateSlot 创建逻辑复制槽
+// CreateSlot creates a logical replication slot
 func (sm *SlotManager) CreateSlot(slotName, plugin string) error {
 	if plugin == "" {
 		plugin = "pgoutput"
@@ -60,7 +60,7 @@ func (sm *SlotManager) CreateSlot(slotName, plugin string) error {
 	return nil
 }
 
-// DropSlot 删除复制槽
+// DropSlot drops a replication slot
 func (sm *SlotManager) DropSlot(slotName string) error {
 	query := "SELECT pg_drop_replication_slot(?)"
 	err := sm.db.Exec(query, slotName).Error
@@ -70,7 +70,7 @@ func (sm *SlotManager) DropSlot(slotName string) error {
 	return nil
 }
 
-// SlotExists 检查复制槽是否存在
+// SlotExists checks if replication slot exists
 func (sm *SlotManager) SlotExists(slotName string) (bool, error) {
 	var exists bool
 	err := sm.db.Raw(

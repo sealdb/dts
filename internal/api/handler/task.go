@@ -11,44 +11,44 @@ import (
 	"github.com/pg/dts/internal/service"
 )
 
-// TaskHandler 任务处理器（按照新的 API 规范）
+// TaskHandler handles tasks (according to the new API specification)
 type TaskHandler struct {
 	service *service.MigrationService
 }
 
-// NewTaskHandler 创建任务处理器
+// NewTaskHandler creates a new task handler
 func NewTaskHandler(svc *service.MigrationService) *TaskHandler {
 	return &TaskHandler{service: svc}
 }
 
-// CreateTaskRequest 创建任务请求
+// CreateTaskRequest represents a create task request
 type CreateTaskRequest struct {
-	TaskID string        `json:"task_id" binding:"required"`
-	Source DBConnection  `json:"source" binding:"required"`
-	Dest   DBConnection  `json:"dest" binding:"required"`
-	Tables []string      `json:"tables,omitempty"` // 可选，如果不指定则同步所有表
+	TaskID string       `json:"task_id" binding:"required"`
+	Source DBConnection `json:"source" binding:"required"`
+	Dest   DBConnection `json:"dest" binding:"required"`
+	Tables []string     `json:"tables,omitempty"` // Optional, if not specified, sync all tables
 }
 
-// DBConnection 数据库连接信息
+// DBConnection represents database connection information
 type DBConnection struct {
-	Domin    string `json:"domin" binding:"required"` // 注意：API 规范中使用 "domin" 而不是 "domain"
+	Domin    string `json:"domin" binding:"required"` // Note: API specification uses "domin" instead of "domain"
 	Port     string `json:"port" binding:"required"`
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
-	Database string `json:"database,omitempty"` // 可选，默认使用 username
+	Database string `json:"database,omitempty"` // Optional, defaults to username
 }
 
-// CreateTaskResponse 创建任务响应
+// CreateTaskResponse represents a create task response
 type CreateTaskResponse struct {
 	State   string `json:"state"`   // OK, ERROR
-	Message string `json:"message"` // 错误描述
+	Message string `json:"message"` // Error description
 }
 
-// CreateTask 启动数据同步任务
+// CreateTask starts a data synchronization task
 // POST /rdscheduler/api/tasks
 func (h *TaskHandler) CreateTask(c *gin.Context) {
 	log := logger.GetLogger()
-	
+
 	var req CreateTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		log.WithError(err).Warn("Failed to bind request JSON")
@@ -66,30 +66,30 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		"tables":  len(req.Tables),
 	}).Info("Creating migration task")
 
-	// 转换请求格式为内部格式
-    sourceDB := model.DBConfig{
-		Host:     req.Source.Domin, // 注意：API 规范中使用 "domin" 而不是 "domain"
+	// Convert request format to internal format
+	sourceDB := model.DBConfig{
+		Host:     req.Source.Domin, // Note: API specification uses "domin" instead of "domain"
 		Port:     parseInt(req.Source.Port, 5432),
 		User:     req.Source.Username,
 		Password: req.Source.Password,
-        DBName:   getStringOrDefault(req.Source.Database, "postgres"),
+		DBName:   getStringOrDefault(req.Source.Database, "postgres"),
 		SSLMode:  "disable",
 	}
 
-    targetDB := model.DBConfig{
-		Host:     req.Dest.Domin, // 注意：API 规范中使用 "domin" 而不是 "domain"
+	targetDB := model.DBConfig{
+		Host:     req.Dest.Domin, // Note: API specification uses "domin" instead of "domain"
 		Port:     parseInt(req.Dest.Port, 5432),
 		User:     req.Dest.Username,
 		Password: req.Dest.Password,
-        DBName:   getStringOrDefault(req.Dest.Database, "postgres"),
+		DBName:   getStringOrDefault(req.Dest.Database, "postgres"),
 		SSLMode:  "disable",
 	}
 
-	// 如果没有指定表，则从源库获取所有表
+	// If no tables specified, get all tables from source database
 	tables := req.Tables
 	if len(tables) == 0 {
 		log.Info("No tables specified, fetching all tables from source database")
-		// 从源库获取所有表
+		// Get all tables from source database
 		sourceRepo, err := repository.NewSourceRepository(sourceDB.DSN())
 		if err != nil {
 			log.WithError(err).Error("Failed to connect to source database")
@@ -101,7 +101,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		}
 		defer sourceRepo.Close()
 
-		// 获取所有表（从 public schema）
+		// Get all tables (from public schema)
 		allTables, err := sourceRepo.GetAllTables("public")
 		if err != nil {
 			log.WithError(err).Error("Failed to get tables from source database")
@@ -125,12 +125,12 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		tables = allTables
 	}
 
-	// 创建任务
+	// Create task
 	createReq := &service.CreateTaskRequest{
 		SourceDB:    sourceDB,
 		TargetDB:    targetDB,
 		Tables:      tables,
-		TableSuffix: "", // 默认无后缀
+		TableSuffix: "", // Default no suffix
 	}
 
 	task, err := h.service.CreateTaskWithID(req.TaskID, createReq)
@@ -145,7 +145,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 
 	log.WithField("task_id", task.ID).Info("Task created successfully, starting task")
 
-	// 自动启动任务
+	// Auto start task
 	if err := h.service.StartTask(c.Request.Context(), task.ID); err != nil {
 		log.WithError(err).Error("Failed to start task")
 		c.JSON(http.StatusInternalServerError, CreateTaskResponse{
@@ -162,16 +162,16 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 	})
 }
 
-// GetTaskStatusResponse 查询任务状态响应
+// GetTaskStatusResponse represents a get task status response
 type GetTaskStatusResponse struct {
 	State    string `json:"state"`    // OK, ERROR
-	Message  string `json:"message"`  // 错误描述
+	Message  string `json:"message"`  // Error description
 	Stage    string `json:"stage"`    // none, syncing, waiting, switching, finished
-	Duration int64  `json:"duration"` // 从切流开始到完成的时间，单位 ms，-1 表示无意义
-	Delay    int64  `json:"delay"`    // 同步延迟，单位 ms，-1 表示无意义
+	Duration int64  `json:"duration"` // Time from switchover start to completion, in ms, -1 means meaningless
+	Delay    int64  `json:"delay"`    // Synchronization delay, in ms, -1 means meaningless
 }
 
-// GetTaskStatus 查询同步任务状态
+// GetTaskStatus queries synchronization task status
 // GET /rdscheduler/api/tasks/{task_id}
 func (h *TaskHandler) GetTaskStatus(c *gin.Context) {
 	taskID := c.Param("task_id")
@@ -179,33 +179,33 @@ func (h *TaskHandler) GetTaskStatus(c *gin.Context) {
 	task, err := h.service.GetTask(taskID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, GetTaskStatusResponse{
-			State:   "ERROR",
-			Message: "Task not found: " + err.Error(),
-			Stage:   "none",
+			State:    "ERROR",
+			Message:  "Task not found: " + err.Error(),
+			Stage:    "none",
 			Duration: -1,
 			Delay:    -1,
 		})
 		return
 	}
 
-	// 映射内部状态到 API 规范的状态
+	// Map internal state to API specification state
 	stage := mapStateToStage(task.State)
 
-	// 计算 duration（从切流开始到完成的时间）
+	// Calculate duration (time from switchover start to completion)
 	duration := int64(-1)
 	if task.StartedAt != nil && task.CompletedAt != nil {
-		// 如果任务已完成，计算总耗时
+		// If task is completed, calculate total time
 		if task.State == string(model.StateCompleted) {
 			duration = task.CompletedAt.Sub(*task.StartedAt).Milliseconds()
 		}
 	}
 
-	// 计算 delay（同步延迟）
-	// TODO: 实现实际的延迟计算（需要从 WAL 复制中获取）
+	// Calculate delay (synchronization delay)
+	// TODO: Implement actual delay calculation (needs to get from WAL replication)
 	delay := int64(-1)
 	if stage == "syncing" || stage == "waiting" || stage == "switching" {
-		// 这里需要从 WAL 复制状态中获取延迟
-		// 暂时返回 -1
+		// Need to get delay from WAL replication status
+		// Temporarily return -1
 		delay = -1
 	}
 
@@ -218,13 +218,13 @@ func (h *TaskHandler) GetTaskStatus(c *gin.Context) {
 	})
 }
 
-// SwitchTaskResponse 切流响应
+// SwitchTaskResponse represents a switch task response
 type SwitchTaskResponse struct {
 	State   string `json:"state"`   // OK, ERROR
-	Message string `json:"message"` // 错误描述
+	Message string `json:"message"` // Error description
 }
 
-// SwitchTask 切流
+// SwitchTask performs switchover
 // POST /rdscheduler/api/tasks/{task_id}/switch
 func (h *TaskHandler) SwitchTask(c *gin.Context) {
 	taskID := c.Param("task_id")
@@ -238,11 +238,11 @@ func (h *TaskHandler) SwitchTask(c *gin.Context) {
 		return
 	}
 
-	// 切流操作：停止源库写入，验证数据，恢复写入
-	// 这对应状态机中的 StoppingWrites -> Validating -> Finalizing
-	// 如果任务在 syncing 状态，需要先切换到 stopping_writes
+	// Switchover operation: stop source database writes, validate data, restore writes
+	// This corresponds to StoppingWrites -> Validating -> Finalizing in the state machine
+	// If task is in syncing state, need to switch to stopping_writes first
 	if task.State == string(model.StateSyncingWAL) {
-		// 触发切流流程
+		// Trigger switchover flow
 		if err := h.service.TriggerSwitchover(c.Request.Context(), taskID); err != nil {
 			c.JSON(http.StatusInternalServerError, SwitchTaskResponse{
 				State:   "ERROR",
@@ -253,7 +253,7 @@ func (h *TaskHandler) SwitchTask(c *gin.Context) {
 	} else if task.State == string(model.StateStoppingWrites) ||
 		task.State == string(model.StateValidating) ||
 		task.State == string(model.StateFinalizing) {
-		// 已经在切流流程中
+		// Already in switchover flow
 		c.JSON(http.StatusOK, SwitchTaskResponse{
 			State:   "OK",
 			Message: "Switchover is already in progress",
@@ -273,18 +273,18 @@ func (h *TaskHandler) SwitchTask(c *gin.Context) {
 	})
 }
 
-// DeleteTaskResponse 删除任务响应
+// DeleteTaskResponse represents a delete task response
 type DeleteTaskResponse struct {
 	State   string `json:"state"`   // OK, ERROR
-	Message string `json:"message"` // 错误描述
+	Message string `json:"message"` // Error description
 }
 
-// DeleteTask 结束任务
+// DeleteTask ends a task
 // DELETE /rdscheduler/api/tasks/{task_id}
 func (h *TaskHandler) DeleteTask(c *gin.Context) {
 	taskID := c.Param("task_id")
 
-	// 取消任务
+	// Cancel task
 	if err := h.service.CancelTask(taskID); err != nil {
 		c.JSON(http.StatusInternalServerError, DeleteTaskResponse{
 			State:   "ERROR",
@@ -293,7 +293,7 @@ func (h *TaskHandler) DeleteTask(c *gin.Context) {
 		return
 	}
 
-	// 删除任务
+	// Delete task
 	if err := h.service.DeleteTask(taskID); err != nil {
 		c.JSON(http.StatusInternalServerError, DeleteTaskResponse{
 			State:   "ERROR",
@@ -308,7 +308,7 @@ func (h *TaskHandler) DeleteTask(c *gin.Context) {
 	})
 }
 
-// mapStateToStage 映射内部状态到 API 规范的状态
+// mapStateToStage maps internal state to API specification state
 func mapStateToStage(state string) string {
 	switch state {
 	case string(model.StateInit), string(model.StateCreatingTables), string(model.StateMigratingData):
@@ -330,7 +330,7 @@ func mapStateToStage(state string) string {
 	}
 }
 
-// parseInt 解析字符串为整数，失败返回默认值
+// parseInt parses string to integer, returns default value on failure
 func parseInt(s string, defaultValue int) int {
 	var result int
 	if _, err := fmt.Sscanf(s, "%d", &result); err != nil {
@@ -339,11 +339,10 @@ func parseInt(s string, defaultValue int) int {
 	return result
 }
 
-// getStringOrDefault 获取字符串，如果为空则返回默认值
+// getStringOrDefault gets string, returns default value if empty
 func getStringOrDefault(s, defaultValue string) string {
 	if s == "" {
 		return defaultValue
 	}
 	return s
 }
-

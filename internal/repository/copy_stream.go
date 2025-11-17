@@ -9,36 +9,36 @@ import (
 	"gorm.io/gorm"
 )
 
-// CopyStreamManager 流式 COPY 管理器
-// 用于 COPY FROM STDIN / TO STDOUT 等高性能场景
+// CopyStreamManager manages streaming COPY operations
+// Used for high-performance scenarios like COPY FROM STDIN / TO STDOUT
 type CopyStreamManager struct {
 	conn *pgx.Conn
 }
 
-// NewCopyStreamManager 创建流式 COPY 管理器
-// 注意：需要从 GORM 连接中获取 pgx.Conn
-// 由于 GORM 使用连接池，无法直接获取底层 pgx.Conn
-// 建议使用 NewCopyStreamManagerFromDSN 直接从 DSN 创建连接
+// NewCopyStreamManager creates a streaming COPY manager
+// Note: Need to extract pgx.Conn from GORM connection
+// Since GORM uses connection pool, cannot directly get underlying pgx.Conn
+// Recommend using NewCopyStreamManagerFromDSN to create connection directly from DSN
 func NewCopyStreamManager(gormDB *gorm.DB) (*CopyStreamManager, error) {
-	// 从 GORM 获取底层 sql.DB
+	// Get underlying sql.DB from GORM
 	_, err := gormDB.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
 	}
 
-	// 获取底层驱动连接（需要转换为 pgx.Conn）
-	// 注意：这需要 GORM 使用 pgx 驱动
-	// 由于 GORM 可能使用不同的连接池，这里提供一个辅助方法
-	// 实际使用时，可能需要直接从 DSN 创建 pgx.Conn
+	// Get underlying driver connection (need to convert to pgx.Conn)
+	// Note: This requires GORM to use pgx driver
+	// Since GORM may use different connection pools, provide a helper method here
+	// In actual use, may need to create pgx.Conn directly from DSN
 
-	// TODO: 实现从 GORM 连接获取 pgx.Conn 的逻辑
-	// 这可能需要使用 pgxpool 或直接创建新连接
+	// TODO: Implement logic to extract pgx.Conn from GORM connection
+	// This may require using pgxpool or creating new connection directly
 
 	return nil, fmt.Errorf("not implemented: need to extract pgx.Conn from gorm.DB, use NewCopyStreamManagerFromDSN instead")
 }
 
-// NewCopyStreamManagerFromDSN 从 DSN 创建流式 COPY 管理器
-// 用于需要最佳性能的场景
+// NewCopyStreamManagerFromDSN creates a streaming COPY manager from DSN
+// Used for scenarios requiring best performance
 func NewCopyStreamManagerFromDSN(dsn string) (*CopyStreamManager, error) {
 	conn, err := pgx.Connect(context.Background(), dsn)
 	if err != nil {
@@ -48,7 +48,7 @@ func NewCopyStreamManagerFromDSN(dsn string) (*CopyStreamManager, error) {
 	return &CopyStreamManager{conn: conn}, nil
 }
 
-// Close 关闭连接
+// Close closes the connection
 func (csm *CopyStreamManager) Close() error {
 	if csm.conn != nil {
 		return csm.conn.Close(context.Background())
@@ -56,35 +56,35 @@ func (csm *CopyStreamManager) Close() error {
 	return nil
 }
 
-// CopyFromStdin 执行 COPY FROM STDIN
-// 这是性能最优的数据导入方式
+// CopyFromStdin executes COPY FROM STDIN
+// This is the most performant data import method
 func (csm *CopyStreamManager) CopyFromStdin(ctx context.Context, tableName string, columns []string, reader io.Reader) (int64, error) {
-	// 使用 pgx 的 CopyFrom API
-	// 这是 PostgreSQL 最高效的数据导入方式
-	// 性能比批量 INSERT 快 3-4 倍
+	// Use pgx CopyFrom API
+	// This is PostgreSQL's most efficient data import method
+	// Performance is 3-4x faster than batch INSERT
 
-	// TODO: 实现 COPY FROM STDIN
-	// 需要使用 pgx 的 CopyFrom 方法
+	// TODO: Implement COPY FROM STDIN
+	// Need to use pgx CopyFrom method
 	return 0, fmt.Errorf("not implemented")
 }
 
-// CopyToStdout 执行 COPY TO STDOUT
-// 这是性能最优的数据导出方式
+// CopyToStdout executes COPY TO STDOUT
+// This is the most performant data export method
 func (csm *CopyStreamManager) CopyToStdout(ctx context.Context, tableName string, columns []string, writer io.Writer) (int64, error) {
-	// 使用 pgx 的 CopyTo API
-	// 这是 PostgreSQL 最高效的数据导出方式
+	// Use pgx CopyTo API
+	// This is PostgreSQL's most efficient data export method
 
-	// TODO: 实现 COPY TO STDOUT
-	// 需要使用 pgx 的 CopyTo 方法
+	// TODO: Implement COPY TO STDOUT
+	// Need to use pgx CopyTo method
 	return 0, fmt.Errorf("not implemented")
 }
 
-// CopyBetweenTables 在两个表之间直接复制数据（使用 COPY）
-// 这是最高效的表间数据复制方式
+// CopyBetweenTables directly copies data between two tables (using COPY)
+// This is the most efficient inter-table data copy method
 func (csm *CopyStreamManager) CopyBetweenTables(ctx context.Context, sourceTable, targetTable string, columns []string) error {
-	// 使用 COPY TO STDOUT 和 COPY FROM STDIN 的组合
-	// 或者使用 PostgreSQL 的 COPY ... TO PROGRAM ... FROM PROGRAM
+	// Use combination of COPY TO STDOUT and COPY FROM STDIN
+	// Or use PostgreSQL's COPY ... TO PROGRAM ... FROM PROGRAM
 
-	// TODO: 实现表间复制
+	// TODO: Implement inter-table copy
 	return fmt.Errorf("not implemented")
 }

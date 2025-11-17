@@ -6,27 +6,27 @@ import (
 	"github.com/pg/dts/internal/model"
 )
 
-// TaskManager 任务管理器，管理所有正在运行的迁移任务
+// TaskManager manages all running migration tasks
 type TaskManager struct {
 	tasks map[string]*model.MigrationTask // key: task ID, value: MigrationTask
-	mu    sync.RWMutex                    // 保护 tasks 的并发访问
+	mu    sync.RWMutex                    // protects concurrent access to tasks
 }
 
-// NewTaskManager 创建任务管理器
+// NewTaskManager creates a new task manager
 func NewTaskManager() *TaskManager {
 	return &TaskManager{
 		tasks: make(map[string]*model.MigrationTask),
 	}
 }
 
-// AddTask 添加任务
+// AddTask adds a task
 func (tm *TaskManager) AddTask(task *model.MigrationTask) {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 	tm.tasks[task.ID] = task
 }
 
-// GetTask 获取任务
+// GetTask gets a task
 func (tm *TaskManager) GetTask(taskID string) (*model.MigrationTask, bool) {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -34,19 +34,19 @@ func (tm *TaskManager) GetTask(taskID string) (*model.MigrationTask, bool) {
 	return task, ok
 }
 
-// RemoveTask 移除任务（并关闭所有连接）
+// RemoveTask removes a task (and closes all connections)
 func (tm *TaskManager) RemoveTask(taskID string) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
 
 	task, ok := tm.tasks[taskID]
 	if !ok {
-		return nil // 任务不存在，无需处理
+		return nil // Task does not exist, no need to process
 	}
 
-	// 关闭任务的所有连接
+	// Close all connections for the task
 	if err := task.CloseAllConnections(); err != nil {
-		// 即使关闭连接失败，也移除任务
+		// Remove task even if closing connections fails
 		delete(tm.tasks, taskID)
 		return err
 	}
@@ -55,7 +55,7 @@ func (tm *TaskManager) RemoveTask(taskID string) error {
 	return nil
 }
 
-// ListTasks 列出所有任务
+// ListTasks lists all tasks
 func (tm *TaskManager) ListTasks() []*model.MigrationTask {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
@@ -68,14 +68,14 @@ func (tm *TaskManager) ListTasks() []*model.MigrationTask {
 	return tasks
 }
 
-// GetTaskCount 获取任务数量
+// GetTaskCount returns the number of tasks
 func (tm *TaskManager) GetTaskCount() int {
 	tm.mu.RLock()
 	defer tm.mu.RUnlock()
 	return len(tm.tasks)
 }
 
-// CleanupCompletedTasks 清理已完成或失败的任务
+// CleanupCompletedTasks cleans up completed or failed tasks
 func (tm *TaskManager) CleanupCompletedTasks() []error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
@@ -86,7 +86,7 @@ func (tm *TaskManager) CleanupCompletedTasks() []error {
 	for taskID, task := range tm.tasks {
 		state := model.StateType(task.State)
 		if state.IsTerminal() {
-			// 任务已完成或失败，需要清理
+			// Task is completed or failed, needs cleanup
 			if err := task.CloseAllConnections(); err != nil {
 				errors = append(errors, err)
 			}
@@ -94,7 +94,7 @@ func (tm *TaskManager) CleanupCompletedTasks() []error {
 		}
 	}
 
-	// 移除已完成的任务
+	// Remove completed tasks
 	for _, taskID := range taskIDsToRemove {
 		delete(tm.tasks, taskID)
 	}

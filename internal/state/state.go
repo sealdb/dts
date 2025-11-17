@@ -6,43 +6,43 @@ import (
 	"github.com/pg/dts/internal/model"
 )
 
-// State 状态接口
+// State represents the state interface
 type State interface {
-	// Name 返回状态名称
+	// Name returns the state name
 	Name() string
 
-	// Execute 执行状态逻辑
+	// Execute executes the state logic
 	Execute(ctx context.Context, task *model.MigrationTask) error
 
-	// Next 返回下一个状态
+	// Next returns the next state
 	Next() State
 
-	// CanTransition 判断是否可以转换
+	// CanTransition returns whether the state can transition
 	CanTransition() bool
 }
 
-// BaseState 基础状态实现
+// BaseState provides base state implementation
 type BaseState struct {
 	name string
 }
 
-// Name 返回状态名称
+// Name returns the state name
 func (b *BaseState) Name() string {
 	return b.name
 }
 
-// CanTransition 默认实现
+// CanTransition provides default implementation
 func (b *BaseState) CanTransition() bool {
 	return true
 }
 
-// StateMachine 状态机
+// StateMachine represents the state machine
 type StateMachine struct {
 	currentState State
 	task         *model.MigrationTask
 }
 
-// NewStateMachine 创建状态机
+// NewStateMachine creates a new state machine
 func NewStateMachine(task *model.MigrationTask) *StateMachine {
 	state := getInitialState(task.State)
 	return &StateMachine{
@@ -51,7 +51,7 @@ func NewStateMachine(task *model.MigrationTask) *StateMachine {
 	}
 }
 
-// Execute 执行当前状态
+// Execute executes the current state
 func (sm *StateMachine) Execute(ctx context.Context) error {
 	if sm.currentState == nil {
 		return ErrInvalidState
@@ -62,7 +62,7 @@ func (sm *StateMachine) Execute(ctx context.Context) error {
 		return err
 	}
 
-	// 检查是否可以转换到下一个状态
+	// Check if can transition to next state
 	if sm.currentState.CanTransition() {
 		nextState := sm.currentState.Next()
 		if nextState != nil {
@@ -73,17 +73,17 @@ func (sm *StateMachine) Execute(ctx context.Context) error {
 	return nil
 }
 
-// GetCurrentState 获取当前状态
+// GetCurrentState returns the current state
 func (sm *StateMachine) GetCurrentState() State {
 	return sm.currentState
 }
 
-// SetState 设置状态（用于恢复）
+// SetState sets the state (for recovery)
 func (sm *StateMachine) SetState(stateName string) {
 	sm.currentState = getStateByName(stateName)
 }
 
-// getInitialState 根据状态名获取初始状态
+// getInitialState gets the initial state by state name
 func getInitialState(stateName string) State {
 	stateType := model.StateType(stateName)
 	switch stateType {
@@ -112,7 +112,7 @@ func getInitialState(stateName string) State {
 	}
 }
 
-// getStateByName 根据名称获取状态
+// getStateByName gets the state by name
 func getStateByName(name string) State {
 	return getInitialState(name)
 }

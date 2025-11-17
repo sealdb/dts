@@ -11,22 +11,22 @@ import (
 )
 
 var (
-	// Logger 全局日志实例
+	// Logger is the global logger instance
 	Logger *logrus.Logger
 )
 
-// Init 初始化日志
+// Init initializes the logger
 func Init(cfg *config.LogConfig) error {
 	Logger = logrus.New()
 
-	// 设置日志级别
+	// Set log level
 	level, err := logrus.ParseLevel(cfg.Level)
 	if err != nil {
 		return fmt.Errorf("invalid log level: %w", err)
 	}
 	Logger.SetLevel(level)
 
-	// 设置日志格式
+	// Set log format
 	switch cfg.Format {
 	case "json":
 		Logger.SetFormatter(&logrus.JSONFormatter{
@@ -41,7 +41,7 @@ func Init(cfg *config.LogConfig) error {
 		return fmt.Errorf("invalid log format: %s (supported: json, text)", cfg.Format)
 	}
 
-	// 设置日志输出
+	// Set log output
 	var output io.Writer
 	switch cfg.Output {
 	case "stdout":
@@ -51,7 +51,7 @@ func Init(cfg *config.LogConfig) error {
 	case "":
 		output = os.Stdout
 	default:
-		// 文件路径
+		// File path
 		dir := filepath.Dir(cfg.Output)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("failed to create log directory: %w", err)
@@ -69,10 +69,10 @@ func Init(cfg *config.LogConfig) error {
 	return nil
 }
 
-// GetLogger 获取日志实例
+// GetLogger returns the logger instance
 func GetLogger() *logrus.Logger {
 	if Logger == nil {
-		// 如果未初始化，使用默认配置
+		// If not initialized, use default configuration
 		Logger = logrus.New()
 		Logger.SetLevel(logrus.InfoLevel)
 		Logger.SetFormatter(&logrus.JSONFormatter{})
@@ -80,8 +80,3 @@ func GetLogger() *logrus.Logger {
 	}
 	return Logger
 }
-
-
-
-
-

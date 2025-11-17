@@ -5,27 +5,27 @@ import (
 	"fmt"
 )
 
-// Handler WAL 变更处理器
+// Handler handles WAL changes
 type Handler struct {
 	tableMapping map[int]TableMapping // relationID -> table mapping
 }
 
-// TableMapping 表映射
+// TableMapping represents table mapping
 type TableMapping struct {
 	Schema     string
 	TableName  string
-	TargetName string // 目标表名（带后缀）
+	TargetName string // Target table name (with suffix)
 	Columns    []string
 }
 
-// NewHandler 创建处理器
+// NewHandler creates a handler
 func NewHandler() *Handler {
 	return &Handler{
 		tableMapping: make(map[int]TableMapping),
 	}
 }
 
-// RegisterTable 注册表映射
+// RegisterTable registers table mapping
 func (h *Handler) RegisterTable(relationID int, schema, tableName, targetName string) {
 	h.tableMapping[relationID] = TableMapping{
 		Schema:     schema,
@@ -34,16 +34,16 @@ func (h *Handler) RegisterTable(relationID int, schema, tableName, targetName st
 	}
 }
 
-// Handle 处理 WAL 消息
+// Handle processes WAL messages
 func (h *Handler) Handle(ctx context.Context, msg Message) error {
 	switch v := msg.(type) {
 	case *RelationMessage:
-		// 关系消息，记录表映射关系
+		// Relation message, record table mapping
 		cols := make([]string, len(v.Columns))
 		for i, c := range v.Columns {
 			cols[i] = c.Name
 		}
-		// 以 schema.tableName 作为 key 注册，TargetName 暂留，由上层注入时注册
+		// Register with schema.tableName as key, TargetName reserved, will be registered when injected by upper layer
 		if m, ok := h.tableMapping[v.RelationID]; ok {
 			m.Columns = cols
 			h.tableMapping[v.RelationID] = m
@@ -51,7 +51,7 @@ func (h *Handler) Handle(ctx context.Context, msg Message) error {
 			h.tableMapping[v.RelationID] = TableMapping{
 				Schema:     v.Namespace,
 				TableName:  v.RelationName,
-				TargetName: v.RelationName, // 默认同名，上层可带后缀覆盖
+				TargetName: v.RelationName, // Default same name, upper layer can override with suffix
 				Columns:    cols,
 			}
 		}
@@ -70,11 +70,11 @@ func (h *Handler) Handle(ctx context.Context, msg Message) error {
 		return h.handleTruncate(ctx, v)
 
 	case *BeginMessage:
-		// 开始事务，可以在这里初始化事务上下文
+		// Begin transaction, can initialize transaction context here
 		return nil
 
 	case *CommitMessage:
-		// 提交事务
+		// Commit transaction
 		return nil
 
 	default:
@@ -82,7 +82,7 @@ func (h *Handler) Handle(ctx context.Context, msg Message) error {
 	}
 }
 
-// handleInsert 处理插入
+// handleInsert handles insert
 func (h *Handler) handleInsert(ctx context.Context, msg *InsertMessage) error {
 	mapping, ok := h.tableMapping[msg.RelationID]
 	if !ok {
@@ -91,11 +91,11 @@ func (h *Handler) handleInsert(ctx context.Context, msg *InsertMessage) error {
 
 	values := tupleToMap(mapping.Columns, msg.Tuple)
 	_ = values
-	// 实际执行应调用目标库执行，这里留给上层集成（TargetRepository.ApplyInsert）
+	// Actual execution should call target database, left for upper layer integration (TargetRepository.ApplyInsert)
 	return nil
 }
 
-// handleUpdate 处理更新
+// handleUpdate handles update
 func (h *Handler) handleUpdate(ctx context.Context, msg *UpdateMessage) error {
 	mapping, ok := h.tableMapping[msg.RelationID]
 	if !ok {
@@ -108,7 +108,7 @@ func (h *Handler) handleUpdate(ctx context.Context, msg *UpdateMessage) error {
 	return nil
 }
 
-// handleDelete 处理删除
+// handleDelete handles delete
 func (h *Handler) handleDelete(ctx context.Context, msg *DeleteMessage) error {
 	mapping, ok := h.tableMapping[msg.RelationID]
 	if !ok {
@@ -120,13 +120,13 @@ func (h *Handler) handleDelete(ctx context.Context, msg *DeleteMessage) error {
 	return nil
 }
 
-// handleTruncate 处理截断
+// handleTruncate handles truncate
 func (h *Handler) handleTruncate(ctx context.Context, msg *TruncateMessage) error {
-	// TODO: 处理截断操作（需要根据 RelationIDs 找到表并执行 TRUNCATE）
+	// TODO: Handle truncate operation (need to find tables by RelationIDs and execute TRUNCATE)
 	return nil
 }
 
-// tupleToMap 将 Tuple 转换为 列名->值 的 map
+// tupleToMap converts Tuple to a map of column name -> value
 func tupleToMap(columns []string, tuple *Tuple) map[string]interface{} {
 	result := make(map[string]interface{})
 	if tuple == nil {

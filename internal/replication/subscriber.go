@@ -10,7 +10,7 @@ import (
 	"github.com/pg/dts/internal/wal"
 )
 
-// Subscriber WAL 订阅者
+// Subscriber is a WAL subscriber
 type Subscriber struct {
 	conn     *pgconn.PgConn
 	decoder  *wal.Decoder
@@ -18,7 +18,7 @@ type Subscriber struct {
 	slotName string
 }
 
-// NewSubscriber 创建订阅者
+// NewSubscriber creates a subscriber
 func NewSubscriber(connString, slotName string) (*Subscriber, error) {
 	conn, err := pgconn.Connect(context.Background(), connString)
 	if err != nil {
@@ -33,7 +33,7 @@ func NewSubscriber(connString, slotName string) (*Subscriber, error) {
 	}, nil
 }
 
-// Close 关闭连接
+// Close closes the connection
 func (s *Subscriber) Close() error {
 	if s.conn != nil {
 		return s.conn.Close(context.Background())
@@ -41,9 +41,9 @@ func (s *Subscriber) Close() error {
 	return nil
 }
 
-// StartReplication 开始复制
+// StartReplication starts replication
 func (s *Subscriber) StartReplication(ctx context.Context, publicationName string) error {
-	// 创建复制流
+	// Create replication stream
 	pluginArgs := []string{
 		"proto_version", "1",
 		"publication_names", publicationName,
@@ -64,48 +64,48 @@ func (s *Subscriber) StartReplication(ctx context.Context, publicationName strin
 	return nil
 }
 
-// ProcessReplicationStream 处理复制流
+// ProcessReplicationStream processes replication stream
 func (s *Subscriber) ProcessReplicationStream(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
-			// 接收消息
+			// Receive message
 			msg, err := s.conn.ReceiveMessage(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to receive message: %w", err)
 			}
 
-			// 处理消息
+			// Process message
 			switch v := msg.(type) {
 			case *pgproto3.CopyData:
 				if err := s.handleCopyData(ctx, v); err != nil {
 					return err
 				}
 			case *pgproto3.NoticeResponse:
-				// 处理通知消息
+				// Handle notice message
 			case *pgproto3.ParameterStatus:
-				// 处理参数状态
+				// Handle parameter status
 			default:
-				// 其他类型的消息
+				// Other message types
 			}
 		}
 	}
 }
 
-// handleCopyData 处理复制数据
+// handleCopyData handles replication data
 func (s *Subscriber) handleCopyData(ctx context.Context, msg *pgproto3.CopyData) error {
 	switch msg.Data[0] {
 	case pglogrepl.PrimaryKeepaliveMessageByteID:
-		// 处理 keepalive 消息
+		// Handle keepalive message
 		pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
 		if err != nil {
 			return fmt.Errorf("failed to parse keepalive: %w", err)
 		}
 
 		if pkm.ServerWALEnd > pglogrepl.LSN(0) {
-			// 发送确认
+			// Send acknowledgment
 			err = pglogrepl.SendStandbyStatusUpdate(
 				ctx,
 				s.conn,
@@ -119,30 +119,30 @@ func (s *Subscriber) handleCopyData(ctx context.Context, msg *pgproto3.CopyData)
 		}
 
 	case pglogrepl.XLogDataByteID:
-		// 处理 XLog 数据
+		// Handle XLog data
 		xld, err := pglogrepl.ParseXLogData(msg.Data[1:])
 		if err != nil {
 			return fmt.Errorf("failed to parse xlog data: %w", err)
 		}
 
-		// 解析逻辑复制消息
+		// Parse logical replication message
 		logicalMsg, err := pglogrepl.Parse(xld.WALData)
 		if err != nil {
 			return fmt.Errorf("failed to parse logical message: %w", err)
 		}
 
-		// 解码消息
+		// Decode message
 		decodedMsg, err := s.decoder.Decode(logicalMsg)
 		if err != nil {
 			return fmt.Errorf("failed to decode message: %w", err)
 		}
 
-		// 处理消息
+		// Handle message
 		if err := s.handler.Handle(ctx, decodedMsg); err != nil {
 			return fmt.Errorf("failed to handle message: %w", err)
 		}
 
-		// 发送确认
+		// Send acknowledgment
 		err = pglogrepl.SendStandbyStatusUpdate(
 			ctx,
 			s.conn,

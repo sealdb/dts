@@ -8,12 +8,12 @@ import (
 	"gorm.io/gorm"
 )
 
-// PublicationManager 发布管理器
+// PublicationManager manages publications
 type PublicationManager struct {
 	db *gorm.DB
 }
 
-// NewPublicationManager 创建发布管理器
+// NewPublicationManager creates a publication manager
 func NewPublicationManager(dsn string) (*PublicationManager, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -32,12 +32,12 @@ func NewPublicationManager(dsn string) (*PublicationManager, error) {
 	return &PublicationManager{db: db}, nil
 }
 
-// NewPublicationManagerFromDB 从已有 GORM 连接创建发布管理器
+// NewPublicationManagerFromDB creates a publication manager from existing GORM connection
 func NewPublicationManagerFromDB(db *gorm.DB) (*PublicationManager, error) {
 	return &PublicationManager{db: db}, nil
 }
 
-// Close 关闭连接（注意：如果使用共享连接，不应该调用此方法）
+// Close closes the connection (note: should not call this method if using shared connection)
 func (pm *PublicationManager) Close() error {
 	sqlDB, err := pm.db.DB()
 	if err != nil {
@@ -46,13 +46,13 @@ func (pm *PublicationManager) Close() error {
 	return sqlDB.Close()
 }
 
-// CreatePublication 创建发布
+// CreatePublication creates a publication
 func (pm *PublicationManager) CreatePublication(pubName string, tables []string) error {
 	if len(tables) == 0 {
 		return fmt.Errorf("no tables specified")
 	}
 
-	// 构建表列表
+	// Build table list
 	tableList := make([]string, len(tables))
 	for i, table := range tables {
 		tableList[i] = fmt.Sprintf("'%s'", table)
@@ -72,7 +72,7 @@ func (pm *PublicationManager) CreatePublication(pubName string, tables []string)
 	return nil
 }
 
-// DropPublication 删除发布
+// DropPublication drops a publication
 func (pm *PublicationManager) DropPublication(pubName string) error {
 	query := fmt.Sprintf("DROP PUBLICATION IF EXISTS %s", pubName)
 	err := pm.db.Exec(query).Error
@@ -82,7 +82,7 @@ func (pm *PublicationManager) DropPublication(pubName string) error {
 	return nil
 }
 
-// PublicationExists 检查发布是否存在
+// PublicationExists checks if publication exists
 func (pm *PublicationManager) PublicationExists(pubName string) (bool, error) {
 	var exists bool
 	err := pm.db.Raw(
@@ -97,7 +97,7 @@ func (pm *PublicationManager) PublicationExists(pubName string) (bool, error) {
 	return exists, nil
 }
 
-// AddTables 向发布添加表
+// AddTables adds tables to publication
 func (pm *PublicationManager) AddTables(pubName string, tables []string) error {
 	if len(tables) == 0 {
 		return fmt.Errorf("no tables specified")

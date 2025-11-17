@@ -8,44 +8,44 @@ import (
 	"gorm.io/gorm"
 )
 
-// MigrationTask 迁移任务
+// MigrationTask represents a migration task
 type MigrationTask struct {
 	ID           string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	SourceDB     string     `gorm:"type:text;not null" json:"source_db"`   // JSON格式的源数据库配置
-	TargetDB     string     `gorm:"type:text;not null" json:"target_db"`   // JSON格式的目标数据库配置
-	Tables       string     `gorm:"type:text;not null" json:"tables"`      // JSON格式的表列表
-	TableSuffix  string     `gorm:"type:varchar(100)" json:"table_suffix"` // 目标表后缀
+	SourceDB     string     `gorm:"type:text;not null" json:"source_db"`   // Source database configuration in JSON format
+	TargetDB     string     `gorm:"type:text;not null" json:"target_db"`   // Target database configuration in JSON format
+	Tables       string     `gorm:"type:text;not null" json:"tables"`      // Table list in JSON format
+	TableSuffix  string     `gorm:"type:varchar(100)" json:"table_suffix"` // Target table suffix
 	State        string     `gorm:"type:varchar(50);not null;default:'init'" json:"state"`
-	Progress     int        `gorm:"default:0" json:"progress"` // 进度 0-100
+	Progress     int        `gorm:"default:0" json:"progress"` // Progress 0-100
 	ErrorMessage string     `gorm:"type:text" json:"error_message"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 	StartedAt    *time.Time `json:"started_at,omitempty"`
 	CompletedAt  *time.Time `json:"completed_at,omitempty"`
 
-	// 运行时字段（不持久化）
-	Connections map[string]interface{} `gorm:"-" json:"-"` // 数据库连接池 key: connectionKey (host:port:dbname), value: *sql.DB 或 *gorm.DB
-	mu          sync.RWMutex           `gorm:"-" json:"-"` // 保护 connections 的并发访问
+	// Runtime fields (not persisted)
+	Connections map[string]interface{} `gorm:"-" json:"-"` // Database connection pool key: connectionKey (host:port:dbname), value: *sql.DB or *gorm.DB
+	mu          sync.RWMutex           `gorm:"-" json:"-"` // Protects concurrent access to connections
 }
 
-// TableName 指定表名
+// TableName specifies the table name
 func (*MigrationTask) TableName() string {
 	return "migration_tasks"
 }
 
-// BeforeCreate 创建前钩子
+// BeforeCreate is a hook before creation
 func (m *MigrationTask) BeforeCreate(tx *gorm.DB) error {
 	if m.ID == "" {
 		m.ID = generateUUID()
 	}
-	// 初始化连接池
+	// Initialize connection pool
 	if m.Connections == nil {
 		m.Connections = make(map[string]interface{})
 	}
 	return nil
 }
 
-// AfterFind 查询后钩子，初始化连接池
+// AfterFind is a hook after query, initializes connection pool
 func (m *MigrationTask) AfterFind(tx *gorm.DB) error {
 	if m.Connections == nil {
 		m.Connections = make(map[string]interface{})
@@ -53,12 +53,12 @@ func (m *MigrationTask) AfterFind(tx *gorm.DB) error {
 	return nil
 }
 
-// ConnectionKey 生成连接键
+// ConnectionKey generates a connection key
 func ConnectionKey(host string, port int, dbname string) string {
 	return fmt.Sprintf("%s:%d:%s", host, port, dbname)
 }
 
-// AddConnection 添加数据库连接
+// AddConnection adds a database connection
 func (m *MigrationTask) AddConnection(key string, conn interface{}) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -68,7 +68,7 @@ func (m *MigrationTask) AddConnection(key string, conn interface{}) {
 	m.Connections[key] = conn
 }
 
-// GetConnection 获取数据库连接
+// GetConnection gets a database connection
 func (m *MigrationTask) GetConnection(key string) (interface{}, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -79,7 +79,7 @@ func (m *MigrationTask) GetConnection(key string) (interface{}, bool) {
 	return conn, ok
 }
 
-// CloseAllConnections 关闭所有连接
+// CloseAllConnections closes all connections
 func (m *MigrationTask) CloseAllConnections() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -101,12 +101,12 @@ func (m *MigrationTask) CloseAllConnections() error {
 				errors = append(errors, fmt.Errorf("failed to close gorm.DB connection %s: %w", key, err))
 			}
 		default:
-			// 未知类型的连接，记录警告但不报错
+			// Unknown connection type, log warning but don't error
 			continue
 		}
 	}
 
-	// 清空连接池
+	// Clear connection pool
 	m.Connections = make(map[string]interface{})
 
 	if len(errors) > 0 {
@@ -116,7 +116,7 @@ func (m *MigrationTask) CloseAllConnections() error {
 	return nil
 }
 
-// GetConnectionCount 获取连接数量（用于调试）
+// GetConnectionCount returns the number of connections (for debugging)
 func (m *MigrationTask) GetConnectionCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -126,7 +126,7 @@ func (m *MigrationTask) GetConnectionCount() int {
 	return len(m.Connections)
 }
 
-// DBConfig 数据库配置
+// DBConfig represents database configuration
 type DBConfig struct {
 	Host     string `json:"host"`
 	Port     int    `json:"port"`
@@ -136,7 +136,7 @@ type DBConfig struct {
 	SSLMode  string `json:"sslmode"`
 }
 
-// DSN 返回数据库连接字符串
+// DSN returns database connection string
 func (d *DBConfig) DSN() string {
 	if d.SSLMode == "" {
 		d.SSLMode = "disable"
@@ -145,12 +145,12 @@ func (d *DBConfig) DSN() string {
 		d.Host, d.Port, d.User, d.Password, d.DBName, d.SSLMode)
 }
 
-// ConnectionKey 返回连接键
+// ConnectionKey returns connection key
 func (d *DBConfig) ConnectionKey() string {
 	return ConnectionKey(d.Host, d.Port, d.DBName)
 }
 
-// TableInfo 表结构信息
+// TableInfo represents table structure information
 type TableInfo struct {
 	Schema      string           `json:"schema"`
 	Name        string           `json:"name"`
@@ -160,7 +160,7 @@ type TableInfo struct {
 	DDL         string           `json:"ddl"`
 }
 
-// ColumnInfo 列信息
+// ColumnInfo represents column information
 type ColumnInfo struct {
 	Name         string `json:"name"`
 	DataType     string `json:"data_type"`
@@ -169,7 +169,7 @@ type ColumnInfo struct {
 	IsPrimaryKey bool   `json:"is_primary_key"`
 }
 
-// IndexInfo 索引信息
+// IndexInfo represents index information
 type IndexInfo struct {
 	Name    string   `json:"name"`
 	Columns []string `json:"columns"`
@@ -177,7 +177,7 @@ type IndexInfo struct {
 	DDL     string   `json:"ddl"`
 }
 
-// ConstraintInfo 约束信息
+// ConstraintInfo represents constraint information
 type ConstraintInfo struct {
 	Name       string   `json:"name"`
 	Type       string   `json:"type"` // PRIMARY KEY, FOREIGN KEY, UNIQUE, CHECK

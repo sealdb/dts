@@ -6,33 +6,33 @@ import (
 	"github.com/pg/dts/internal/model"
 )
 
-// PausedState 暂停状态
+// PausedState represents the paused state
 type PausedState struct {
 	BaseState
 }
 
-// NewPausedState 创建暂停状态
+// NewPausedState creates a new paused state
 func NewPausedState() *PausedState {
 	return &PausedState{
 		BaseState: BaseState{name: model.StatePaused.String()},
 	}
 }
 
-// Execute 执行暂停状态逻辑
+// Execute executes the paused state logic
 func (s *PausedState) Execute(ctx context.Context, task *model.MigrationTask) error {
-	// 暂停状态不需要执行任何操作
-	// 等待恢复命令
+	// Paused state does not need to perform any operations
+	// Wait for resume command
 	return nil
 }
 
-// Next 返回下一个状态（需要根据当前任务状态决定）
+// Next returns the next state (needs to be determined based on current task state)
 func (s *PausedState) Next() State {
-	// 暂停后恢复时，需要根据任务状态决定恢复到哪里
-	// 这里返回 nil，由外部调用者决定
+	// When resuming after pause, need to determine where to resume based on task state
+	// Return nil here, let external caller decide
 	return nil
 }
 
-// CanTransition 暂停状态可以转换
+// CanTransition returns whether the paused state can transition
 func (s *PausedState) CanTransition() bool {
-	return false // 暂停状态需要外部命令才能转换
+	return false // Paused state requires external command to transition
 }

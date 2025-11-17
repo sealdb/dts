@@ -8,23 +8,23 @@ import (
 	"github.com/pg/dts/internal/service"
 )
 
-// MigrationHandler 迁移任务处理器
+// MigrationHandler handles migration tasks
 type MigrationHandler struct {
 	service *service.MigrationService
 }
 
-// NewMigrationHandler 创建迁移任务处理器
+// NewMigrationHandler creates a new migration task handler
 func NewMigrationHandler(svc *service.MigrationService) *MigrationHandler {
 	return &MigrationHandler{service: svc}
 }
 
-// CreateTask 创建迁移任务
-// @Summary 创建迁移任务
-// @Description 创建新的数据库迁移任务
+// CreateTask creates a migration task
+// @Summary Create migration task
+// @Description Create a new database migration task
 // @Tags migrations
 // @Accept json
 // @Produce json
-// @Param task body service.CreateTaskRequest true "迁移任务信息"
+// @Param task body service.CreateTaskRequest true "Migration task information"
 // @Success 201 {object} model.MigrationTask
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
@@ -51,13 +51,13 @@ func (h *MigrationHandler) CreateTask(c *gin.Context) {
 	c.JSON(http.StatusCreated, task)
 }
 
-// GetTask 获取任务详情
-// @Summary 获取任务详情
-// @Description 根据ID获取迁移任务详情
+// GetTask gets task details
+// @Summary Get task details
+// @Description Get migration task details by ID
 // @Tags migrations
 // @Accept json
 // @Produce json
-// @Param id path string true "任务ID"
+// @Param id path string true "Task ID"
 // @Success 200 {object} model.MigrationTask
 // @Failure 404 {object} ErrorResponse
 // @Router /api/v1/migrations/{id} [get]
@@ -76,14 +76,14 @@ func (h *MigrationHandler) GetTask(c *gin.Context) {
 	c.JSON(http.StatusOK, task)
 }
 
-// ListTasks 获取任务列表
-// @Summary 获取任务列表
-// @Description 获取迁移任务列表
+// ListTasks gets task list
+// @Summary Get task list
+// @Description Get migration task list
 // @Tags migrations
 // @Accept json
 // @Produce json
-// @Param limit query int false "限制数量" default(10)
-// @Param offset query int false "偏移量" default(0)
+// @Param limit query int false "Limit count" default(10)
+// @Param offset query int false "Offset" default(0)
 // @Success 200 {array} model.MigrationTask
 // @Router /api/v1/migrations [get]
 func (h *MigrationHandler) ListTasks(c *gin.Context) {
@@ -102,13 +102,13 @@ func (h *MigrationHandler) ListTasks(c *gin.Context) {
 	c.JSON(http.StatusOK, tasks)
 }
 
-// StartTask 启动任务
-// @Summary 启动任务
-// @Description 启动迁移任务
+// StartTask starts a task
+// @Summary Start task
+// @Description Start migration task
 // @Tags migrations
 // @Accept json
 // @Produce json
-// @Param id path string true "任务ID"
+// @Param id path string true "Task ID"
 // @Success 200 {object} SuccessResponse
 // @Failure 404 {object} ErrorResponse
 // @Router /api/v1/migrations/{id}/start [post]
@@ -128,13 +128,13 @@ func (h *MigrationHandler) StartTask(c *gin.Context) {
 	})
 }
 
-// PauseTask 暂停任务
-// @Summary 暂停任务
-// @Description 暂停迁移任务
+// PauseTask pauses a task
+// @Summary Pause task
+// @Description Pause migration task
 // @Tags migrations
 // @Accept json
 // @Produce json
-// @Param id path string true "任务ID"
+// @Param id path string true "Task ID"
 // @Success 200 {object} SuccessResponse
 // @Router /api/v1/migrations/{id}/pause [post]
 func (h *MigrationHandler) PauseTask(c *gin.Context) {
@@ -153,13 +153,13 @@ func (h *MigrationHandler) PauseTask(c *gin.Context) {
 	})
 }
 
-// ResumeTask 恢复任务
-// @Summary 恢复任务
-// @Description 恢复暂停的迁移任务
+// ResumeTask resumes a task
+// @Summary Resume task
+// @Description Resume paused migration task
 // @Tags migrations
 // @Accept json
 // @Produce json
-// @Param id path string true "任务ID"
+// @Param id path string true "Task ID"
 // @Success 200 {object} SuccessResponse
 // @Router /api/v1/migrations/{id}/resume [post]
 func (h *MigrationHandler) ResumeTask(c *gin.Context) {
@@ -178,13 +178,13 @@ func (h *MigrationHandler) ResumeTask(c *gin.Context) {
 	})
 }
 
-// CancelTask 取消任务
-// @Summary 取消任务
-// @Description 取消迁移任务
+// CancelTask cancels a task
+// @Summary Cancel task
+// @Description Cancel migration task
 // @Tags migrations
 // @Accept json
 // @Produce json
-// @Param id path string true "任务ID"
+// @Param id path string true "Task ID"
 // @Success 200 {object} SuccessResponse
 // @Router /api/v1/migrations/{id}/cancel [post]
 func (h *MigrationHandler) CancelTask(c *gin.Context) {
@@ -203,13 +203,13 @@ func (h *MigrationHandler) CancelTask(c *gin.Context) {
 	})
 }
 
-// GetTaskStatus 获取任务状态
-// @Summary 获取任务状态
-// @Description 获取迁移任务当前状态
+// GetTaskStatus gets task status
+// @Summary Get task status
+// @Description Get current status of migration task
 // @Tags migrations
 // @Accept json
 // @Produce json
-// @Param id path string true "任务ID"
+// @Param id path string true "Task ID"
 // @Success 200 {object} StatusResponse
 // @Router /api/v1/migrations/{id}/status [get]
 func (h *MigrationHandler) GetTaskStatus(c *gin.Context) {
@@ -232,18 +232,18 @@ func (h *MigrationHandler) GetTaskStatus(c *gin.Context) {
 	})
 }
 
-// ErrorResponse 错误响应
+// ErrorResponse represents an error response
 type ErrorResponse struct {
 	Error   string `json:"error"`
 	Details string `json:"details,omitempty"`
 }
 
-// SuccessResponse 成功响应
+// SuccessResponse represents a success response
 type SuccessResponse struct {
 	Message string `json:"message"`
 }
 
-// StatusResponse 状态响应
+// StatusResponse represents a status response
 type StatusResponse struct {
 	ID       string `json:"id"`
 	State    string `json:"state"`

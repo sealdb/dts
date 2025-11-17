@@ -6,17 +6,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// HealthHandler 健康检查处理器
+// HealthHandler handles health checks
 type HealthHandler struct{}
 
-// NewHealthHandler 创建健康检查处理器
+// NewHealthHandler creates a new health check handler
 func NewHealthHandler() *HealthHandler {
 	return &HealthHandler{}
 }
 
-// Check 健康检查
-// @Summary 健康检查
-// @Description 检查服务健康状态
+// Check performs health check
+// @Summary Health check
+// @Description Check service health status
 // @Tags health
 // @Accept json
 // @Produce json
@@ -28,7 +28,7 @@ func (h *HealthHandler) Check(c *gin.Context) {
 	})
 }
 
-// HealthResponse 健康响应
+// HealthResponse represents a health response
 type HealthResponse struct {
 	Status string `json:"status"`
 }

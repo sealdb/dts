@@ -6,29 +6,29 @@ import (
 	"github.com/pg/dts/internal/service"
 )
 
-// SetupRoutes 设置路由
+// SetupRoutes sets up routes
 func SetupRoutes(router *gin.Engine, migrationService *service.MigrationService) {
-	// 新的 API 路由（按照规范）
+	// New API routes (according to specification)
 	rdscheduler := router.Group("/rdscheduler/api")
 	{
 		taskHandler := handler.NewTaskHandler(migrationService)
 		tasks := rdscheduler.Group("/tasks")
 		{
-			tasks.POST("", taskHandler.CreateTask)                    // 启动数据同步任务
-			tasks.GET("/:task_id", taskHandler.GetTaskStatus)         // 查询同步任务状态
-			tasks.POST("/:task_id/switch", taskHandler.SwitchTask)    // 切流
-			tasks.DELETE("/:task_id", taskHandler.DeleteTask)         // 结束任务
+			tasks.POST("", taskHandler.CreateTask)                 // Start data synchronization task
+			tasks.GET("/:task_id", taskHandler.GetTaskStatus)      // Query synchronization task status
+			tasks.POST("/:task_id/switch", taskHandler.SwitchTask) // Switchover
+			tasks.DELETE("/:task_id", taskHandler.DeleteTask)      // End task
 		}
 	}
 
-	// 保留旧的 API 路由（用于兼容或内部管理）
+	// Keep old API routes (for compatibility or internal management)
 	api := router.Group("/api/v1")
 	{
-		// 健康检查
+		// Health check
 		healthHandler := handler.NewHealthHandler()
 		api.GET("/health", healthHandler.Check)
 
-		// 迁移任务（内部管理接口）
+		// Migration tasks (internal management interface)
 		migrationHandler := handler.NewMigrationHandler(migrationService)
 		migrations := api.Group("/migrations")
 		{

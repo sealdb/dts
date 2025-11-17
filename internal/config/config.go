@@ -10,20 +10,20 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config 应用配置
+// Config represents application configuration
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"` // 元数据库配置
+	Database DatabaseConfig `yaml:"database"` // Metadata database configuration
 	Log      LogConfig      `yaml:"log"`
 }
 
-// ServerConfig 服务器配置
+// ServerConfig represents server configuration
 type ServerConfig struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 }
 
-// DatabaseConfig 元数据库配置
+// DatabaseConfig represents metadata database configuration
 type DatabaseConfig struct {
 	Host     string `yaml:"host"`
 	Port     int    `yaml:"port"`
@@ -33,32 +33,32 @@ type DatabaseConfig struct {
 	SSLMode  string `yaml:"sslmode"`
 }
 
-// LogConfig 日志配置
+// LogConfig represents log configuration
 type LogConfig struct {
 	Level  string `yaml:"level"`
 	Format string `yaml:"format"`
 	Output string `yaml:"output"`
 }
 
-// Load 加载配置文件（兼容旧接口）
+// Load loads configuration file (compatible with old interface)
 func Load(configPath string) (*Config, error) {
 	cfg, _, err := LoadWithFlags(configPath)
 	return cfg, err
 }
 
-// LoadWithFlags 加载配置文件并返回命令行参数
+// LoadWithFlags loads configuration file and returns command line flags
 func LoadWithFlags(configPath string) (*Config, *Flags, error) {
-	// 解析命令行参数
+	// Parse command line arguments
 	flags := parseFlags()
 
-	// 如果指定了配置文件路径，使用命令行参数
+	// If config file path is specified, use command line argument
 	if flags.ConfigPath != "" {
 		configPath = flags.ConfigPath
 	}
 
 	var config Config
 
-	// 如果配置文件存在，加载它
+	// If config file exists, load it
 	if configPath != "" {
 		data, err := os.ReadFile(configPath)
 		if err != nil {
@@ -70,16 +70,16 @@ func LoadWithFlags(configPath string) (*Config, *Flags, error) {
 		}
 	}
 
-	// 设置默认值
+	// Set default values
 	setDefaults(&config)
 
-	// 命令行参数覆盖配置文件
+	// Command line arguments override config file
 	applyFlags(&config, flags)
 
 	return &config, flags, nil
 }
 
-// Flags 命令行参数
+// Flags represents command line flags
 type Flags struct {
 	ConfigPath  string
 	Host        string
@@ -96,11 +96,11 @@ type Flags struct {
 	ShowVersion bool
 }
 
-// parseFlags 解析命令行参数
+// parseFlags parses command line arguments
 func parseFlags() *Flags {
 	flags := &Flags{}
 
-	// 先读取环境变量
+	// Read environment variables first
 	flags.ConfigPath = os.Getenv("DTS_CONFIG")
 	if flags.Host == "" {
 		flags.Host = os.Getenv("DTS_HOST")
@@ -114,33 +114,33 @@ func parseFlags() *Flags {
 	flags.LogFormat = os.Getenv("DTS_LOG_FORMAT")
 	flags.LogOutput = os.Getenv("DTS_LOG_OUTPUT")
 
-	// 定义命令行参数（会覆盖环境变量）
-	flag.StringVar(&flags.ConfigPath, "config", flags.ConfigPath, "配置文件路径 (默认: configs/config.yaml)")
-	flag.StringVar(&flags.ConfigPath, "c", flags.ConfigPath, "配置文件路径 (简写)")
+	// Define command line arguments (will override environment variables)
+	flag.StringVar(&flags.ConfigPath, "config", flags.ConfigPath, "Config file path (default: configs/config.yaml)")
+	flag.StringVar(&flags.ConfigPath, "c", flags.ConfigPath, "Config file path (short)")
 
-	flag.StringVar(&flags.Host, "host", flags.Host, "服务器监听地址 (覆盖配置文件)")
-	flag.IntVar(&flags.Port, "port", flags.Port, "服务器端口 (覆盖配置文件)")
+	flag.StringVar(&flags.Host, "host", flags.Host, "Server listen address (overrides config file)")
+	flag.IntVar(&flags.Port, "port", flags.Port, "Server port (overrides config file)")
 
-	flag.StringVar(&flags.LogLevel, "log-level", flags.LogLevel, "日志级别: debug, info, warn, error (覆盖配置文件)")
-	flag.StringVar(&flags.LogFormat, "log-format", flags.LogFormat, "日志格式: json, text (覆盖配置文件)")
-	flag.StringVar(&flags.LogOutput, "log-output", flags.LogOutput, "日志输出: stdout, stderr, 文件路径 (覆盖配置文件)")
+	flag.StringVar(&flags.LogLevel, "log-level", flags.LogLevel, "Log level: debug, info, warn, error (overrides config file)")
+	flag.StringVar(&flags.LogFormat, "log-format", flags.LogFormat, "Log format: json, text (overrides config file)")
+	flag.StringVar(&flags.LogOutput, "log-output", flags.LogOutput, "Log output: stdout, stderr, file path (overrides config file)")
 
-	flag.StringVar(&flags.DBHost, "db-host", "", "元数据库主机 (覆盖配置文件)")
-	flag.IntVar(&flags.DBPort, "db-port", 0, "元数据库端口 (覆盖配置文件)")
-	flag.StringVar(&flags.DBUser, "db-user", "", "元数据库用户 (覆盖配置文件)")
-	flag.StringVar(&flags.DBPassword, "db-password", "", "元数据库密码 (覆盖配置文件)")
-	flag.StringVar(&flags.DBName, "db-name", "", "元数据库名称 (覆盖配置文件)")
-	flag.StringVar(&flags.DBSSLMode, "db-sslmode", "", "元数据库 SSL 模式 (覆盖配置文件)")
+	flag.StringVar(&flags.DBHost, "db-host", "", "Metadata database host (overrides config file)")
+	flag.IntVar(&flags.DBPort, "db-port", 0, "Metadata database port (overrides config file)")
+	flag.StringVar(&flags.DBUser, "db-user", "", "Metadata database user (overrides config file)")
+	flag.StringVar(&flags.DBPassword, "db-password", "", "Metadata database password (overrides config file)")
+	flag.StringVar(&flags.DBName, "db-name", "", "Metadata database name (overrides config file)")
+	flag.StringVar(&flags.DBSSLMode, "db-sslmode", "", "Metadata database SSL mode (overrides config file)")
 
-	flag.BoolVar(&flags.ShowVersion, "version", false, "显示版本信息")
-	flag.BoolVar(&flags.ShowVersion, "v", false, "显示版本信息 (简写)")
+	flag.BoolVar(&flags.ShowVersion, "version", false, "Show version information")
+	flag.BoolVar(&flags.ShowVersion, "v", false, "Show version information (short)")
 
 	flag.Parse()
 
 	return flags
 }
 
-// setDefaults 设置默认值
+// setDefaults sets default values
 func setDefaults(config *Config) {
 	if config.Server.Host == "" {
 		config.Server.Host = "0.0.0.0"
@@ -160,9 +160,9 @@ func setDefaults(config *Config) {
 	if config.Database.Password == "" {
 		config.Database.Password = "postgres"
 	}
-    if config.Database.DBName == "" {
-        config.Database.DBName = "postgres"
-    }
+	if config.Database.DBName == "" {
+		config.Database.DBName = "postgres"
+	}
 	if config.Database.SSLMode == "" {
 		config.Database.SSLMode = "disable"
 	}
@@ -177,7 +177,7 @@ func setDefaults(config *Config) {
 	}
 }
 
-// applyFlags 应用命令行参数（覆盖配置文件）
+// applyFlags applies command line arguments (overrides config file)
 func applyFlags(config *Config, flags *Flags) {
 	if flags.Host != "" {
 		config.Server.Host = flags.Host
@@ -214,21 +214,21 @@ func applyFlags(config *Config, flags *Flags) {
 	}
 }
 
-// PrintUsage 打印使用说明
+// PrintUsage prints usage information
 func PrintUsage() {
 	fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\n", os.Args[0])
 	fmt.Fprintf(os.Stderr, "Options:\n")
 	flag.PrintDefaults()
 	fmt.Fprintf(os.Stderr, "\nEnvironment Variables:\n")
-	fmt.Fprintf(os.Stderr, "  DTS_CONFIG      - 配置文件路径\n")
-	fmt.Fprintf(os.Stderr, "  DTS_HOST        - 服务器监听地址\n")
-	fmt.Fprintf(os.Stderr, "  DTS_PORT        - 服务器端口\n")
-	fmt.Fprintf(os.Stderr, "  DTS_LOG_LEVEL   - 日志级别\n")
-	fmt.Fprintf(os.Stderr, "  DTS_LOG_FORMAT  - 日志格式\n")
-	fmt.Fprintf(os.Stderr, "  DTS_LOG_OUTPUT  - 日志输出\n")
+	fmt.Fprintf(os.Stderr, "  DTS_CONFIG      - Config file path\n")
+	fmt.Fprintf(os.Stderr, "  DTS_HOST        - Server listen address\n")
+	fmt.Fprintf(os.Stderr, "  DTS_PORT        - Server port\n")
+	fmt.Fprintf(os.Stderr, "  DTS_LOG_LEVEL   - Log level\n")
+	fmt.Fprintf(os.Stderr, "  DTS_LOG_FORMAT  - Log format\n")
+	fmt.Fprintf(os.Stderr, "  DTS_LOG_OUTPUT  - Log output\n")
 }
 
-// DSN 返回数据库连接字符串
+// DSN returns database connection string
 func (d *DatabaseConfig) DSN() string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		d.Host, d.Port, d.User, d.Password, d.DBName, d.SSLMode)

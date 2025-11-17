@@ -9,19 +9,19 @@ import (
 	"gorm.io/gorm"
 )
 
-// TargetRepository 目标库操作
+// TargetRepository handles target database operations
 type TargetRepository struct {
 	db *gorm.DB
 }
 
-// NewTargetRepository 创建目标库仓储
+// NewTargetRepository creates a target repository
 func NewTargetRepository(dsn string) (*TargetRepository, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to target database: %w", err)
 	}
 
-	// 设置连接池参数
+	// Set connection pool parameters
 	sqlDB, err := db.DB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
@@ -30,7 +30,7 @@ func NewTargetRepository(dsn string) (*TargetRepository, error) {
 	sqlDB.SetMaxOpenConns(10)
 	sqlDB.SetMaxIdleConns(5)
 
-	// 验证连接
+	// Verify connection
 	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping target database: %w", err)
 	}
@@ -38,7 +38,7 @@ func NewTargetRepository(dsn string) (*TargetRepository, error) {
 	return &TargetRepository{db: db}, nil
 }
 
-// NewTargetRepositoryFromTask 从任务创建目标库仓储（使用连接池）
+// NewTargetRepositoryFromTask creates a target repository from task (using connection pool)
 func NewTargetRepositoryFromTask(task *model.MigrationTask) (*TargetRepository, error) {
 	db, err := GetOrCreateTargetGORMConnection(task)
 	if err != nil {
@@ -48,7 +48,7 @@ func NewTargetRepositoryFromTask(task *model.MigrationTask) (*TargetRepository, 
 	return &TargetRepository{db: db}, nil
 }
 
-// Close 关闭连接
+// Close closes the connection
 func (r *TargetRepository) Close() error {
 	sqlDB, err := r.db.DB()
 	if err != nil {
@@ -57,35 +57,35 @@ func (r *TargetRepository) Close() error {
 	return sqlDB.Close()
 }
 
-// GetDB 获取底层 GORM DB（用于特殊操作）
+// GetDB gets the underlying GORM DB (for special operations)
 func (r *TargetRepository) GetDB() *gorm.DB {
 	return r.db
 }
 
-// CreateTable 创建表
+// CreateTable creates a table
 func (r *TargetRepository) CreateTable(tableInfo *model.TableInfo, suffix string) error {
-	// 修改表名为 tableName + suffix
+	// Modify table name to tableName + suffix
 	targetTableName := tableInfo.Name + suffix
 
-	// 修改 DDL 中的表名
+	// Modify table name in DDL
 	ddl := strings.Replace(tableInfo.DDL,
 		fmt.Sprintf("%s.%s", tableInfo.Schema, tableInfo.Name),
 		fmt.Sprintf("%s.%s", tableInfo.Schema, targetTableName),
 		1)
 
-	// 执行 DDL
+	// Execute DDL
 	if err := r.db.Exec(ddl).Error; err != nil {
 		return fmt.Errorf("failed to create table %s: %w", targetTableName, err)
 	}
 
-	// 创建索引
+	// Create indexes
 	for _, idx := range tableInfo.Indexes {
 		if err := r.createIndex(tableInfo.Schema, targetTableName, idx, suffix); err != nil {
 			return fmt.Errorf("failed to create index %s: %w", idx.Name, err)
 		}
 	}
 
-	// 创建约束（除了主键，已在 DDL 中）
+	// Create constraints (except primary key, already in DDL)
 	for _, constraint := range tableInfo.Constraints {
 		if constraint.Type != "PRIMARY KEY" {
 			if err := r.createConstraint(tableInfo.Schema, targetTableName, constraint); err != nil {
@@ -97,9 +97,9 @@ func (r *TargetRepository) CreateTable(tableInfo *model.TableInfo, suffix string
 	return nil
 }
 
-// createIndex 创建索引
+// createIndex creates an index
 func (r *TargetRepository) createIndex(schema, tableName string, index model.IndexInfo, suffix string) error {
-	// 修改索引名和表名
+	// Modify index name and table name
 	indexName := index.Name + suffix
 	indexDDL := strings.Replace(index.DDL, index.Name, indexName, 1)
 	indexDDL = strings.Replace(indexDDL,
@@ -110,7 +110,7 @@ func (r *TargetRepository) createIndex(schema, tableName string, index model.Ind
 	return r.db.Exec(indexDDL).Error
 }
 
-// createConstraint 创建约束
+// createConstraint creates a constraint
 func (r *TargetRepository) createConstraint(schema, tableName string, constraint model.ConstraintInfo) error {
 	var constraintDDL string
 
@@ -122,7 +122,7 @@ func (r *TargetRepository) createConstraint(schema, tableName string, constraint
 		constraintDDL = fmt.Sprintf("ALTER TABLE %s.%s ADD CONSTRAINT %s CHECK (%s)",
 			schema, tableName, constraint.Name, constraint.Definition)
 	case "FOREIGN KEY":
-		// 外键需要更复杂的处理，这里简化
+		// Foreign keys require more complex handling, simplified here
 		constraintDDL = fmt.Sprintf("ALTER TABLE %s.%s ADD CONSTRAINT %s %s",
 			schema, tableName, constraint.Name, constraint.Definition)
 	default:
@@ -132,7 +132,7 @@ func (r *TargetRepository) createConstraint(schema, tableName string, constraint
 	return r.db.Exec(constraintDDL).Error
 }
 
-// GetTableCount 获取表行数
+// GetTableCount gets table row count
 func (r *TargetRepository) GetTableCount(schema, tableName string) (int64, error) {
 	var count int64
 	query := fmt.Sprintf(`SELECT COUNT(*) FROM %s.%s`, schema, tableName)
@@ -143,42 +143,42 @@ func (r *TargetRepository) GetTableCount(schema, tableName string) (int64, error
 	return count, nil
 }
 
-// CopyData 复制数据
+// CopyData copies data
 func (r *TargetRepository) CopyData(sourceRepo *SourceRepository, sourceSchema, sourceTable, targetSchema, targetTable string) error {
-	// 获取源表的列信息
+	// Get source table column information
 	tableInfo, err := sourceRepo.GetTableInfo(sourceSchema, sourceTable)
 	if err != nil {
 		return fmt.Errorf("failed to get table info: %w", err)
 	}
 
-	// 构建列名列表
+	// Build column name list
 	var columns []string
 	for _, col := range tableInfo.Columns {
 		columns = append(columns, col.Name)
 	}
 	_ = strings.Join
 
-	// 使用 COPY 命令复制数据（留作未来优化）
-	// 这里简化为批量读取+插入
-	// 这里需要获取源库的 pgx.Conn 连接
-	// 简化实现：使用批量查询和插入
+	// Use COPY command to copy data (reserved for future optimization)
+	// Simplified here to batch read + insert
+	// Need to get source database pgx.Conn connection
+	// Simplified implementation: use batch query and insert
 	return r.copyDataBatched(sourceRepo.db, sourceSchema, sourceTable, targetSchema, targetTable, columns)
 }
 
-// copyDataBatched 批量复制数据
+// copyDataBatched copies data in batches
 func (r *TargetRepository) copyDataBatched(sourceDB *gorm.DB, sourceSchema, sourceTable, targetSchema, targetTable string, columns []string) error {
 	batchSize := 1000
 	offset := 0
 
 	for {
-		// 从源库查询一批数据
+		// Query a batch of data from source database
 		query := fmt.Sprintf("SELECT %s FROM %s.%s ORDER BY 1 LIMIT ? OFFSET ?",
 			strings.Join(columns, ", "), sourceSchema, sourceTable)
 
 		type Row map[string]interface{}
 		var rows []Row
 
-		// 使用 GORM 查询
+		// Use GORM to query
 		if err := sourceDB.Raw(query, batchSize, offset).Scan(&rows).Error; err != nil {
 			return fmt.Errorf("failed to query source: %w", err)
 		}
@@ -187,7 +187,7 @@ func (r *TargetRepository) copyDataBatched(sourceDB *gorm.DB, sourceSchema, sour
 			break
 		}
 
-		// 转换为批量插入格式
+		// Convert to batch insert format
 		batch := make([][]interface{}, len(rows))
 		for i, row := range rows {
 			values := make([]interface{}, len(columns))
@@ -197,12 +197,12 @@ func (r *TargetRepository) copyDataBatched(sourceDB *gorm.DB, sourceSchema, sour
 			batch[i] = values
 		}
 
-		// 批量插入到目标库
+		// Batch insert into target database
 		if err := r.batchInsert(targetSchema, targetTable, columns, batch); err != nil {
 			return fmt.Errorf("failed to insert batch: %w", err)
 		}
 
-		// 如果批次小于 batchSize，说明已经读取完所有数据
+		// If batch size is less than batchSize, all data has been read
 		if len(batch) < batchSize {
 			break
 		}
@@ -213,13 +213,13 @@ func (r *TargetRepository) copyDataBatched(sourceDB *gorm.DB, sourceSchema, sour
 	return nil
 }
 
-// batchInsert 批量插入
+// batchInsert performs batch insert
 func (r *TargetRepository) batchInsert(schema, table string, columns []string, batch [][]interface{}) error {
 	if len(batch) == 0 {
 		return nil
 	}
 
-	// 构建 INSERT 语句
+	// Build INSERT statement
 	placeholders := make([]string, len(batch))
 	args := make([]interface{}, 0, len(batch)*len(columns))
 
@@ -240,7 +240,7 @@ func (r *TargetRepository) batchInsert(schema, table string, columns []string, b
 	return r.db.Exec(query, args...).Error
 }
 
-// ApplyInsert 应用插入操作
+// ApplyInsert applies insert operation
 func (r *TargetRepository) ApplyInsert(schema, tableName string, values map[string]interface{}) error {
 	if len(values) == 0 {
 		return nil
@@ -260,7 +260,7 @@ func (r *TargetRepository) ApplyInsert(schema, tableName string, values map[stri
 	return r.db.Exec(query, args...).Error
 }
 
-// ApplyUpdate 应用更新操作
+// ApplyUpdate applies update operation
 func (r *TargetRepository) ApplyUpdate(schema, tableName string, oldValues, newValues map[string]interface{}) error {
 	if len(newValues) == 0 || len(oldValues) == 0 {
 		return nil
@@ -284,7 +284,7 @@ func (r *TargetRepository) ApplyUpdate(schema, tableName string, oldValues, newV
 	return r.db.Exec(query, args...).Error
 }
 
-// ApplyDelete 应用删除操作
+// ApplyDelete applies delete operation
 func (r *TargetRepository) ApplyDelete(schema, tableName string, values map[string]interface{}) error {
 	if len(values) == 0 {
 		return nil

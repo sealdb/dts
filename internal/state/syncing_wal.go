@@ -10,33 +10,33 @@ import (
 	"github.com/pg/dts/internal/repository"
 )
 
-// SyncingWALState 同步WAL状态
+// SyncingWALState represents the syncing WAL state
 type SyncingWALState struct {
 	BaseState
 }
 
-// NewSyncingWALState 创建同步WAL状态
+// NewSyncingWALState creates a new syncing WAL state
 func NewSyncingWALState() *SyncingWALState {
 	return &SyncingWALState{
 		BaseState: BaseState{name: model.StateSyncingWAL.String()},
 	}
 }
 
-// Execute 执行WAL同步逻辑
+// Execute executes the WAL synchronization logic
 func (s *SyncingWALState) Execute(ctx context.Context, task *model.MigrationTask) error {
-	// 解析表列表
+	// Parse table list
 	tables, err := repository.ParseTables(task)
 	if err != nil {
 		return fmt.Errorf("failed to parse tables: %w", err)
 	}
 
-	// 获取或创建源库 GORM 连接（使用连接池）
+	// Get or create source GORM connection (using connection pool)
 	sourceDB, err := repository.GetOrCreateSourceGORMConnection(task)
 	if err != nil {
 		return fmt.Errorf("failed to get source connection: %w", err)
 	}
 
-	// 确保连接有效
+	// Ensure connection is valid
 	sqlDB, err := sourceDB.DB()
 	if err != nil {
 		return fmt.Errorf("failed to get sql.DB from gorm.DB: %w", err)
@@ -45,25 +45,25 @@ func (s *SyncingWALState) Execute(ctx context.Context, task *model.MigrationTask
 		return fmt.Errorf("source connection is not valid: %w", err)
 	}
 
-	// 创建复制槽管理器（使用已有连接）
+	// Create replication slot manager (using existing connection)
 	slotManager, err := replication.NewSlotManagerFromDB(sourceDB)
 	if err != nil {
 		return fmt.Errorf("failed to create slot manager: %w", err)
 	}
-	// 注意：slotManager 使用共享连接，不单独关闭
+	// Note: slotManager uses shared connection, don't close separately
 
-	// 创建发布管理器（使用已有连接）
+	// Create publication manager (using existing connection)
 	pubManager, err := replication.NewPublicationManagerFromDB(sourceDB)
 	if err != nil {
 		return fmt.Errorf("failed to create publication manager: %w", err)
 	}
-	// 注意：pubManager 使用共享连接，不单独关闭
+	// Note: pubManager uses shared connection, don't close separately
 
-	// 生成复制槽和发布名称
+	// Generate replication slot and publication names
 	slotName := fmt.Sprintf("dts_slot_%s", task.ID)
 	pubName := fmt.Sprintf("dts_pub_%s", task.ID)
 
-	// 检查并创建复制槽
+	// Check and create replication slot
 	exists, err := slotManager.SlotExists(slotName)
 	if err != nil {
 		return fmt.Errorf("failed to check slot existence: %w", err)
@@ -75,14 +75,14 @@ func (s *SyncingWALState) Execute(ctx context.Context, task *model.MigrationTask
 		}
 	}
 
-	// 检查并创建发布
+	// Check and create publication
 	exists, err = pubManager.PublicationExists(pubName)
 	if err != nil {
 		return fmt.Errorf("failed to check publication existence: %w", err)
 	}
 
 	if !exists {
-		// 构建表名列表（格式：schema.table）
+		// Build table name list (format: schema.table)
 		schema := "public"
 		tableNames := make([]string, len(tables))
 		for i, table := range tables {
@@ -94,13 +94,13 @@ func (s *SyncingWALState) Execute(ctx context.Context, task *model.MigrationTask
 		}
 	}
 
-	// 创建订阅者并开始同步
-	// 注意：这里需要启动一个后台 goroutine 来处理 WAL 流
-	// 实际实现中，应该使用 context 来控制同步的停止
-	// 这里简化实现，同步一段时间后返回
-	// 实际应该持续运行直到 StoppingWrites 状态
+	// Create subscriber and start synchronization
+	// Note: Need to start a background goroutine to handle WAL stream
+	// In actual implementation, should use context to control synchronization stop
+	// Here is a simplified implementation that returns after syncing for a period
+	// Should actually run continuously until StoppingWrites state
 
-	// TODO: 启动 WAL 订阅者
+	// TODO: Start WAL subscriber
 	// subscriber, err := replication.NewSubscriber(sourceDB.DSN(), slotName)
 	// if err != nil {
 	// 	return fmt.Errorf("failed to create subscriber: %w", err)
@@ -111,21 +111,21 @@ func (s *SyncingWALState) Execute(ctx context.Context, task *model.MigrationTask
 	// 	return fmt.Errorf("failed to start replication: %w", err)
 	// }
 	//
-	// // 在后台处理复制流
+	// // Process replication stream in background
 	// go func() {
 	// 	if err := subscriber.ProcessReplicationStream(ctx); err != nil {
-	// 		// 处理错误
+	// 		// Handle error
 	// 	}
 	// }()
 
-	// 等待一段时间让 WAL 同步（实际应该持续运行）
-	// 这里简化实现
+	// Wait for a period to let WAL sync (should actually run continuously)
+	// This is a simplified implementation
 	time.Sleep(1 * time.Second)
 
 	return nil
 }
 
-// Next 返回下一个状态
+// Next returns the next state
 func (s *SyncingWALState) Next() State {
 	return NewStoppingWritesState()
 }
