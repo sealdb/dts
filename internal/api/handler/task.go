@@ -23,10 +23,11 @@ func NewTaskHandler(svc *service.MigrationService) *TaskHandler {
 
 // CreateTaskRequest represents a create task request
 type CreateTaskRequest struct {
-	TaskID string       `json:"task_id" binding:"required"`
-	Source DBConnection `json:"source" binding:"required"`
-	Dest   DBConnection `json:"dest" binding:"required"`
-	Tables []string     `json:"tables,omitempty"` // Optional, if not specified, sync all tables
+	TaskID      string       `json:"task_id" binding:"required"`
+	DatabaseType string      `json:"database_type" binding:"required"` // postgresql, mysql, etc.
+	Source      DBConnection `json:"source" binding:"required"`
+	Dest        DBConnection `json:"dest" binding:"required"`
+	Tables      []string     `json:"tables,omitempty"` // Optional, if not specified, sync all tables
 }
 
 // DBConnection represents database connection information
@@ -45,7 +46,7 @@ type CreateTaskResponse struct {
 }
 
 // CreateTask starts a data synchronization task
-// POST /rdscheduler/api/tasks
+// POST /dts/api/tasks
 func (h *TaskHandler) CreateTask(c *gin.Context) {
 	log := logger.GetLogger()
 
@@ -127,10 +128,11 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 
 	// Create task
 	createReq := &service.CreateTaskRequest{
-		SourceDB:    sourceDB,
-		TargetDB:    targetDB,
-		Tables:      tables,
-		TableSuffix: "", // Default no suffix
+		DatabaseType: req.DatabaseType,
+		SourceDB:     sourceDB,
+		TargetDB:     targetDB,
+		Tables:       tables,
+		TableSuffix:  "", // Default no suffix
 	}
 
 	task, err := h.service.CreateTaskWithID(req.TaskID, createReq)
@@ -143,22 +145,11 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		return
 	}
 
-	log.WithField("task_id", task.ID).Info("Task created successfully, starting task")
-
-	// Auto start task
-	if err := h.service.StartTask(c.Request.Context(), task.ID); err != nil {
-		log.WithError(err).Error("Failed to start task")
-		c.JSON(http.StatusInternalServerError, CreateTaskResponse{
-			State:   "ERROR",
-			Message: "Failed to start task: " + err.Error(),
-		})
-		return
-	}
-
-	log.WithField("task_id", task.ID).Info("Task started successfully")
+	log.WithField("task_id", task.ID).Info("Task created successfully")
+	// Note: Task is created in Init state, need to call /:task_id/start to begin
 	c.JSON(http.StatusOK, CreateTaskResponse{
 		State:   "OK",
-		Message: "Task created and started successfully",
+		Message: "Task created successfully. Call /:task_id/start to begin migration.",
 	})
 }
 
@@ -172,7 +163,7 @@ type GetTaskStatusResponse struct {
 }
 
 // GetTaskStatus queries synchronization task status
-// GET /rdscheduler/api/tasks/{task_id}
+// GET /dts/api/tasks/{task_id}
 func (h *TaskHandler) GetTaskStatus(c *gin.Context) {
 	taskID := c.Param("task_id")
 
@@ -225,7 +216,7 @@ type SwitchTaskResponse struct {
 }
 
 // SwitchTask performs switchover
-// POST /rdscheduler/api/tasks/{task_id}/switch
+// POST /dts/api/tasks/{task_id}/switch
 func (h *TaskHandler) SwitchTask(c *gin.Context) {
 	taskID := c.Param("task_id")
 
@@ -238,31 +229,21 @@ func (h *TaskHandler) SwitchTask(c *gin.Context) {
 		return
 	}
 
-	// Switchover operation: stop source database writes, validate data, restore writes
-	// This corresponds to StoppingWrites -> Validating -> Finalizing in the state machine
-	// If task is in syncing state, need to switch to stopping_writes first
-	if task.State == string(model.StateSyncingWAL) {
-		// Trigger switchover flow
-		if err := h.service.TriggerSwitchover(c.Request.Context(), taskID); err != nil {
-			c.JSON(http.StatusInternalServerError, SwitchTaskResponse{
-				State:   "ERROR",
-				Message: "Failed to trigger switchover: " + err.Error(),
-			})
-			return
-		}
-	} else if task.State == string(model.StateStoppingWrites) ||
-		task.State == string(model.StateValidating) ||
-		task.State == string(model.StateFinalizing) {
-		// Already in switchover flow
-		c.JSON(http.StatusOK, SwitchTaskResponse{
-			State:   "OK",
-			Message: "Switchover is already in progress",
-		})
-		return
-	} else {
+	// Switchover operation: only allowed in Waiting state
+	// This transitions from Waiting -> Validating -> Completed
+	if task.State != string(model.StateWaiting) {
 		c.JSON(http.StatusBadRequest, SwitchTaskResponse{
 			State:   "ERROR",
-			Message: "Task is not in a state that allows switchover. Current state: " + task.State,
+			Message: fmt.Sprintf("Task must be in 'waiting' state to perform switchover. Current state: %s", task.State),
+		})
+		return
+	}
+
+	// Trigger switchover flow (Waiting -> Validating)
+	if err := h.service.TriggerSwitchover(c.Request.Context(), taskID); err != nil {
+		c.JSON(http.StatusInternalServerError, SwitchTaskResponse{
+			State:   "ERROR",
+			Message: "Failed to trigger switchover: " + err.Error(),
 		})
 		return
 	}
@@ -280,7 +261,7 @@ type DeleteTaskResponse struct {
 }
 
 // StartTask starts a task
-// POST /rdscheduler/api/tasks/{task_id}/start
+// POST /dts/api/tasks/{task_id}/start
 func (h *TaskHandler) StartTask(c *gin.Context) {
 	taskID := c.Param("task_id")
 
@@ -299,7 +280,7 @@ func (h *TaskHandler) StartTask(c *gin.Context) {
 }
 
 // StopTask stops a task (task remains, just stops running)
-// POST /rdscheduler/api/tasks/{task_id}/stop
+// POST /dts/api/tasks/{task_id}/stop
 func (h *TaskHandler) StopTask(c *gin.Context) {
 	taskID := c.Param("task_id")
 
@@ -318,7 +299,7 @@ func (h *TaskHandler) StopTask(c *gin.Context) {
 }
 
 // PauseTask pauses a task
-// POST /rdscheduler/api/tasks/{task_id}/pause
+// POST /dts/api/tasks/{task_id}/pause
 func (h *TaskHandler) PauseTask(c *gin.Context) {
 	taskID := c.Param("task_id")
 
@@ -337,7 +318,7 @@ func (h *TaskHandler) PauseTask(c *gin.Context) {
 }
 
 // ResumeTask resumes a task
-// POST /rdscheduler/api/tasks/{task_id}/resume
+// POST /dts/api/tasks/{task_id}/resume
 func (h *TaskHandler) ResumeTask(c *gin.Context) {
 	taskID := c.Param("task_id")
 
@@ -356,7 +337,7 @@ func (h *TaskHandler) ResumeTask(c *gin.Context) {
 }
 
 // DeleteTask deletes a task
-// DELETE /rdscheduler/api/tasks/{task_id}
+// DELETE /dts/api/tasks/{task_id}
 func (h *TaskHandler) DeleteTask(c *gin.Context) {
 	taskID := c.Param("task_id")
 
@@ -378,13 +359,15 @@ func (h *TaskHandler) DeleteTask(c *gin.Context) {
 // mapStateToStage maps internal state to API specification state
 func mapStateToStage(state string) string {
 	switch state {
-	case string(model.StateInit), string(model.StateCreatingTables), string(model.StateMigratingData):
+	case string(model.StateInit):
+		return "none"
+	case string(model.StateConnect), string(model.StateCreateTables), string(model.StateFullSync):
 		return "syncing"
-	case string(model.StateSyncingWAL):
+	case string(model.StateIncSync):
 		return "syncing"
-	case string(model.StateStoppingWrites):
-		return "switching"
-	case string(model.StateValidating), string(model.StateFinalizing):
+	case string(model.StateWaiting):
+		return "waiting"
+	case string(model.StateValidating):
 		return "switching"
 	case string(model.StateCompleted):
 		return "finished"
@@ -392,6 +375,8 @@ func mapStateToStage(state string) string {
 		return "none"
 	case string(model.StatePaused):
 		return "waiting"
+	case string(model.StateDeleted):
+		return "none"
 	default:
 		return "none"
 	}

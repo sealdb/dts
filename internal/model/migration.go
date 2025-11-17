@@ -11,10 +11,11 @@ import (
 // MigrationTask represents a migration task
 type MigrationTask struct {
 	ID           string     `gorm:"primaryKey;type:varchar(36)" json:"id"`
-	SourceDB     string     `gorm:"type:text;not null" json:"source_db"`   // Source database configuration in JSON format
-	TargetDB     string     `gorm:"type:text;not null" json:"target_db"`   // Target database configuration in JSON format
-	Tables       string     `gorm:"type:text;not null" json:"tables"`      // Table list in JSON format
-	TableSuffix  string     `gorm:"type:varchar(100)" json:"table_suffix"` // Target table suffix
+	DatabaseType string     `gorm:"type:varchar(20);not null;default:'postgresql'" json:"database_type"` // Database type: postgresql, mysql, etc.
+	SourceDB     string     `gorm:"type:text;not null" json:"source_db"`                                   // Source database configuration in JSON format
+	TargetDB     string     `gorm:"type:text;not null" json:"target_db"`                                   // Target database configuration in JSON format
+	Tables       string     `gorm:"type:text;not null" json:"tables"`                                      // Table list in JSON format
+	TableSuffix  string     `gorm:"type:varchar(100)" json:"table_suffix"`                                 // Target table suffix
 	State        string     `gorm:"type:varchar(50);not null;default:'init'" json:"state"`
 	Progress     int        `gorm:"default:0" json:"progress"` // Progress 0-100
 	ErrorMessage string     `gorm:"type:text" json:"error_message"`
@@ -47,6 +48,14 @@ func (m *MigrationTask) BeforeCreate(tx *gorm.DB) error {
 
 // AfterFind is a hook after query, initializes connection pool
 func (m *MigrationTask) AfterFind(tx *gorm.DB) error {
+	// Skip hook if no data was found (e.g., during AutoMigrate structure queries)
+	// This prevents "insufficient arguments" errors during schema operations
+	if m == nil || m.ID == "" {
+		return nil
+	}
+
+	// Initialize connections map if nil
+	// Only do this when we have actual data
 	if m.Connections == nil {
 		m.Connections = make(map[string]interface{})
 	}

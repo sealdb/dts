@@ -3,7 +3,7 @@
 # 查询任务状态脚本
 
 TASK_ID="${1:-test-task-001}"
-BASE_URL="http://localhost:8080/rdscheduler/api"
+BASE_URL="http://localhost:8080/dts/api"
 
 echo "=== 查询任务状态 ==="
 echo "Task ID: $TASK_ID"

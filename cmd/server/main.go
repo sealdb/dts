@@ -15,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 var (
@@ -61,15 +62,29 @@ func main() {
 		"db":   cfg.Database.DBName,
 	}).Info("Connecting to metadata database")
 
-	db, err := gorm.Open(postgres.Open(cfg.Database.DSN()), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(cfg.Database.DSN()), &gorm.Config{
+		PrepareStmt: false, // Disable prepared statements to avoid "insufficient arguments" error
+		Logger:      gormlogger.Default.LogMode(gormlogger.Info), // TODO: need to delete
+	})
 	if err != nil {
 		log.WithError(err).Fatal("Failed to connect to metadata database")
 	}
 
 	// Auto migrate table structure (ensure tables exist)
 	log.Info("Initializing database schema")
-	if err := db.AutoMigrate(&model.MigrationTask{}); err != nil {
-		log.WithError(err).Fatal("Failed to initialize database schema")
+	migrator := db.Migrator()
+	if !migrator.HasTable(&model.MigrationTask{}) {
+		if err := migrator.CreateTable(&model.MigrationTask{}); err != nil {
+			log.WithError(err).Fatal("Failed to create migration_tasks table")
+		}
+		log.Info("Created migration_tasks table")
+	} else {
+		// Table exists, use Migrator().AutoMigrate() to update schema if needed
+		// This should avoid triggering AfterFind hook during schema queries
+		if err := migrator.AutoMigrate(&model.MigrationTask{}); err != nil {
+			log.WithError(err).WithField("error_type", fmt.Sprintf("%T", err)).Fatal("Failed to migrate database schema")
+		}
+		log.Info("Updated migration_tasks table schema")
 	}
 	log.Info("Database schema initialized")
 

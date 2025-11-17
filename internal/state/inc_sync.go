@@ -10,20 +10,20 @@ import (
 	"github.com/pg/dts/internal/repository"
 )
 
-// SyncingWALState represents the syncing WAL state
-type SyncingWALState struct {
+// IncSyncState represents the incremental sync state
+type IncSyncState struct {
 	BaseState
 }
 
-// NewSyncingWALState creates a new syncing WAL state
-func NewSyncingWALState() *SyncingWALState {
-	return &SyncingWALState{
-		BaseState: BaseState{name: model.StateSyncingWAL.String()},
+// NewIncSyncState creates a new incremental sync state
+func NewIncSyncState() *IncSyncState {
+	return &IncSyncState{
+		BaseState: BaseState{name: model.StateIncSync.String()},
 	}
 }
 
-// Execute executes the WAL synchronization logic
-func (s *SyncingWALState) Execute(ctx context.Context, task *model.MigrationTask) error {
+// Execute executes the incremental synchronization logic
+func (s *IncSyncState) Execute(ctx context.Context, task *model.MigrationTask) error {
 	// Parse table list
 	tables, err := repository.ParseTables(task)
 	if err != nil {
@@ -98,7 +98,7 @@ func (s *SyncingWALState) Execute(ctx context.Context, task *model.MigrationTask
 	// Note: Need to start a background goroutine to handle WAL stream
 	// In actual implementation, should use context to control synchronization stop
 	// Here is a simplified implementation that returns after syncing for a period
-	// Should actually run continuously until StoppingWrites state
+	// Should actually run continuously until Waiting state
 
 	// TODO: Start WAL subscriber
 	// subscriber, err := replication.NewSubscriber(sourceDB.DSN(), slotName)
@@ -126,6 +126,7 @@ func (s *SyncingWALState) Execute(ctx context.Context, task *model.MigrationTask
 }
 
 // Next returns the next state
-func (s *SyncingWALState) Next() State {
-	return NewStoppingWritesState()
+func (s *IncSyncState) Next() State {
+	return NewWaitingState()
 }
+

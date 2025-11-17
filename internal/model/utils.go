@@ -15,16 +15,17 @@ func generateUUID() string {
 type StateType string
 
 const (
-	StateInit           StateType = "init"
-	StateCreatingTables StateType = "creating_tables"
-	StateMigratingData  StateType = "migrating_data"
-	StateSyncingWAL     StateType = "syncing_wal"
-	StateStoppingWrites StateType = "stopping_writes"
-	StateValidating     StateType = "validating"
-	StateFinalizing     StateType = "finalizing"
-	StateCompleted      StateType = "completed"
-	StateFailed         StateType = "failed"
-	StatePaused         StateType = "paused"
+	StateInit         StateType = "init"
+	StateConnect      StateType = "connect"
+	StateCreateTables StateType = "create_tables"
+	StateFullSync     StateType = "full_sync"
+	StateIncSync      StateType = "inc_sync"
+	StateWaiting      StateType = "waiting"
+	StateValidating   StateType = "validating"
+	StateCompleted    StateType = "completed"
+	StateFailed       StateType = "failed"
+	StatePaused       StateType = "paused"
+	StateDeleted      StateType = "deleted"
 )
 
 // String returns the string representation of the state
@@ -34,21 +35,25 @@ func (s StateType) String() string {
 
 // IsTerminal checks if the state is terminal
 func (s StateType) IsTerminal() bool {
-	return s == StateCompleted || s == StateFailed
+	return s == StateCompleted || s == StateFailed || s == StateDeleted
 }
 
 // CanTransition checks if can transition to target state
 func (s StateType) CanTransition(target StateType) bool {
 	// Define state transition rules
 	transitions := map[StateType][]StateType{
-		StateInit:           {StateCreatingTables, StateFailed},
-		StateCreatingTables: {StateMigratingData, StateFailed, StatePaused},
-		StateMigratingData:  {StateSyncingWAL, StateFailed, StatePaused},
-		StateSyncingWAL:     {StateStoppingWrites, StateFailed, StatePaused},
-		StateStoppingWrites: {StateValidating, StateFailed},
-		StateValidating:     {StateFinalizing, StateFailed},
-		StateFinalizing:     {StateCompleted, StateFailed},
-		StatePaused:         {StateMigratingData, StateSyncingWAL, StateFailed},
+		StateInit:       {StateConnect, StateFailed},
+		StateConnect:    {StateCreateTables, StateFailed, StatePaused},
+		StateCreateTables: {StateFullSync, StateFailed, StatePaused},
+		StateFullSync:   {StateIncSync, StateFailed, StatePaused},
+		StateIncSync:    {StateWaiting, StateFailed, StatePaused},
+		StateWaiting:    {StateValidating, StateFailed, StatePaused},
+		StateValidating: {StateCompleted, StateFailed},
+		StatePaused:     {StateConnect, StateCreateTables, StateFullSync, StateIncSync, StateWaiting, StateFailed},
+		// Terminal states cannot transition
+		StateCompleted: {},
+		StateFailed:    {},
+		StateDeleted:   {},
 	}
 
 	allowed, exists := transitions[s]
@@ -68,16 +73,17 @@ func (s StateType) CanTransition(target StateType) bool {
 // GetStateDisplayName gets the display name of the state
 func GetStateDisplayName(state StateType) string {
 	names := map[StateType]string{
-		StateInit:           "Initializing",
-		StateCreatingTables: "Creating target tables",
-		StateMigratingData:  "Migrating data",
-		StateSyncingWAL:     "Syncing WAL logs",
-		StateStoppingWrites: "Stopping source database writes",
-		StateValidating:     "Validating data",
-		StateFinalizing:     "Finalizing migration",
-		StateCompleted:      "Completed",
-		StateFailed:         "Failed",
-		StatePaused:         "Paused",
+		StateInit:       "Initializing",
+		StateConnect:    "Connecting to databases",
+		StateCreateTables: "Creating target tables",
+		StateFullSync:   "Full data synchronization",
+		StateIncSync:    "Incremental synchronization",
+		StateWaiting:    "Waiting for switchover",
+		StateValidating: "Validating data",
+		StateCompleted:  "Completed",
+		StateFailed:     "Failed",
+		StatePaused:     "Paused",
+		StateDeleted:    "Deleted",
 	}
 
 	if name, ok := names[state]; ok {
@@ -94,7 +100,7 @@ func UpdateTaskState(task *MigrationTask, newState StateType, errorMsg string) {
 	}
 
 	now := time.Now()
-	if newState == StateMigratingData && task.StartedAt == nil {
+	if newState == StateConnect && task.StartedAt == nil {
 		task.StartedAt = &now
 	}
 	if newState.IsTerminal() {

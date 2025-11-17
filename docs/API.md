@@ -6,7 +6,7 @@
 
 ## 基础信息
 
-- **Base URL**: `http://<host>:<port>/rdscheduler/api`
+- **Base URL**: `http://<host>:<port>/dts/api`
 - **Content-Type**: `application/json`
 - **字符编码**: UTF-8
 
@@ -25,7 +25,7 @@
 
 ### 1. 启动数据同步任务
 
-**接口路径**: `POST /rdscheduler/api/tasks`
+**接口路径**: `POST /dts/api/tasks`
 
 **功能描述**: 创建并启动一个新的数据同步任务。
 
@@ -98,7 +98,7 @@
 
 ### 2. 查询同步任务状态
 
-**接口路径**: `GET /rdscheduler/api/tasks/{task_id}`
+**接口路径**: `GET /dts/api/tasks/{task_id}`
 
 **功能描述**: 查询指定任务的同步状态。
 
@@ -185,7 +185,7 @@
 
 ### 3. 切流
 
-**接口路径**: `POST /rdscheduler/api/tasks/{task_id}/switch`
+**接口路径**: `POST /dts/api/tasks/{task_id}/switch`
 
 **功能描述**: 触发切流操作。切流包括：停止源库写入、验证数据一致性、恢复源库写入。
 
@@ -239,7 +239,7 @@
 
 ### 4. 结束任务
 
-**接口路径**: `DELETE /rdscheduler/api/tasks/{task_id}`
+**接口路径**: `DELETE /dts/api/tasks/{task_id}`
 
 **功能描述**: 结束并删除指定的同步任务。
 
@@ -345,7 +345,7 @@
 ### 示例 1: 创建并启动同步任务
 
 ```bash
-curl -X POST http://localhost:8080/rdscheduler/api/tasks \
+curl -X POST http://localhost:8080/dts/api/tasks \
   -H "Content-Type: application/json" \
   -d '{
     "task_id": "task-001",
@@ -368,19 +368,19 @@ curl -X POST http://localhost:8080/rdscheduler/api/tasks \
 ### 示例 2: 查询任务状态
 
 ```bash
-curl -X GET http://localhost:8080/rdscheduler/api/tasks/task-001
+curl -X GET http://localhost:8080/dts/api/tasks/task-001
 ```
 
 ### 示例 3: 触发切流
 
 ```bash
-curl -X POST http://localhost:8080/rdscheduler/api/tasks/task-001/switch
+curl -X POST http://localhost:8080/dts/api/tasks/task-001/switch
 ```
 
 ### 示例 4: 删除任务
 
 ```bash
-curl -X DELETE http://localhost:8080/rdscheduler/api/tasks/task-001
+curl -X DELETE http://localhost:8080/dts/api/tasks/task-001
 ```
 
 ---

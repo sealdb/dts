@@ -8,20 +8,20 @@ import (
 	"github.com/pg/dts/internal/repository"
 )
 
-// MigratingDataState represents the migrating data state
-type MigratingDataState struct {
+// FullSyncState represents the full sync state
+type FullSyncState struct {
 	BaseState
 }
 
-// NewMigratingDataState creates a new migrating data state
-func NewMigratingDataState() *MigratingDataState {
-	return &MigratingDataState{
-		BaseState: BaseState{name: model.StateMigratingData.String()},
+// NewFullSyncState creates a new full sync state
+func NewFullSyncState() *FullSyncState {
+	return &FullSyncState{
+		BaseState: BaseState{name: model.StateFullSync.String()},
 	}
 }
 
-// Execute executes the data migration logic
-func (s *MigratingDataState) Execute(ctx context.Context, task *model.MigrationTask) error {
+// Execute executes the full data synchronization logic
+func (s *FullSyncState) Execute(ctx context.Context, task *model.MigrationTask) error {
 	// Parse table list
 	tables, err := repository.ParseTables(task)
 	if err != nil {
@@ -41,7 +41,7 @@ func (s *MigratingDataState) Execute(ctx context.Context, task *model.MigrationT
 	}
 	// Connections are managed by task manager, don't close here
 
-	// Migrate data for each table
+	// Migrate data for each table using replication technology
 	schema := "public"
 	for i, tableName := range tables {
 		sourceTable := tableName
@@ -61,6 +61,7 @@ func (s *MigratingDataState) Execute(ctx context.Context, task *model.MigrationT
 }
 
 // Next returns the next state
-func (s *MigratingDataState) Next() State {
-	return NewSyncingWALState()
+func (s *FullSyncState) Next() State {
+	return NewIncSyncState()
 }
+

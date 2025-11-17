@@ -89,24 +89,26 @@ func getInitialState(stateName string) State {
 	switch stateType {
 	case model.StateInit:
 		return NewInitState()
-	case model.StateCreatingTables:
-		return NewCreatingTablesState()
-	case model.StateMigratingData:
-		return NewMigratingDataState()
-	case model.StateSyncingWAL:
-		return NewSyncingWALState()
-	case model.StateStoppingWrites:
-		return NewStoppingWritesState()
+	case model.StateConnect:
+		return NewConnectState()
+	case model.StateCreateTables:
+		return NewCreateTablesState()
+	case model.StateFullSync:
+		return NewFullSyncState()
+	case model.StateIncSync:
+		return NewIncSyncState()
+	case model.StateWaiting:
+		return NewWaitingState()
 	case model.StateValidating:
 		return NewValidatingState()
-	case model.StateFinalizing:
-		return NewFinalizingState()
 	case model.StateCompleted:
 		return NewCompletedState()
 	case model.StateFailed:
 		return NewFailedState()
 	case model.StatePaused:
 		return NewPausedState()
+	case model.StateDeleted:
+		return NewDeletedState()
 	default:
 		return NewInitState()
 	}

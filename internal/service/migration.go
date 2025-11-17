@@ -58,8 +58,14 @@ func (s *MigrationService) CreateTaskWithID(id string, req *CreateTaskRequest) (
 		return nil, fmt.Errorf("failed to marshal tables: %w", err)
 	}
 
+	databaseType := req.DatabaseType
+	if databaseType == "" {
+		databaseType = "postgresql" // Default to PostgreSQL
+	}
+
 	task := &model.MigrationTask{
 		ID:           id,
+		DatabaseType: databaseType,
 		SourceDB:     string(sourceDBJSON),
 		TargetDB:     string(targetDBJSON),
 		Tables:       string(tablesJSON),
@@ -94,7 +100,13 @@ func (s *MigrationService) CreateTask(req *CreateTaskRequest) (*model.MigrationT
 		return nil, fmt.Errorf("failed to marshal tables: %w", err)
 	}
 
+	databaseType := req.DatabaseType
+	if databaseType == "" {
+		databaseType = "postgresql" // Default to PostgreSQL
+	}
+
 	task := &model.MigrationTask{
+		DatabaseType: databaseType,
 		SourceDB:     string(sourceDBJSON),
 		TargetDB:     string(targetDBJSON),
 		Tables:       string(tablesJSON),
@@ -138,6 +150,14 @@ func (s *MigrationService) StartTask(ctx context.Context, id string) error {
 		err := fmt.Errorf("task is in terminal state: %s", currentState)
 		log.WithError(err).Warn("Cannot start task")
 		return err
+	}
+
+	// If task is in Init state, transition to Connect state
+	if currentState == model.StateInit {
+		if err := s.taskRepo.UpdateState(id, model.StateConnect, ""); err != nil {
+			return fmt.Errorf("failed to transition from init to connect: %w", err)
+		}
+		task.State = model.StateConnect.String()
 	}
 
 	// Check if task is already running
@@ -274,19 +294,19 @@ func isRetryable(err error) bool {
 func progressForState(s model.StateType) int {
 	switch s {
 	case model.StateInit:
-		return 5
-	case model.StateCreatingTables:
+		return 0
+	case model.StateConnect:
+		return 10
+	case model.StateCreateTables:
 		return 20
-	case model.StateMigratingData:
-		return 60
-	case model.StateSyncingWAL:
-		return 75
-	case model.StateStoppingWrites:
-		return 85
+	case model.StateFullSync:
+		return 50
+	case model.StateIncSync:
+		return 70
+	case model.StateWaiting:
+		return 80
 	case model.StateValidating:
 		return 95
-	case model.StateFinalizing:
-		return 99
 	case model.StateCompleted:
 		return 100
 	default:
@@ -337,22 +357,24 @@ func (s *MigrationService) DeleteTask(id string) error {
 }
 
 // TriggerSwitchover triggers switchover
+// Only allowed when task is in Waiting state
 func (s *MigrationService) TriggerSwitchover(ctx context.Context, id string) error {
 	task, err := s.taskRepo.GetByID(id)
 	if err != nil {
 		return err
 	}
 
-	// If task is in syncing_wal state, switch to stopping_writes
-	if task.State == string(model.StateSyncingWAL) {
-		// Update state to stopping_writes
-		return s.taskRepo.UpdateState(id, model.StateStoppingWrites, "")
+	// Check if task is in Waiting state
+	if task.State != string(model.StateWaiting) {
+		return fmt.Errorf("task must be in 'waiting' state to perform switchover. Current state: %s", task.State)
 	}
 
-	return fmt.Errorf("task is not in a state that allows switchover: %s", task.State)
+	// Transition from Waiting to Validating state
+	return s.taskRepo.UpdateState(id, model.StateValidating, "")
 }
 
 // StopTask stops a task (task remains, just stops running)
+// Stops the task and transitions directly to Completed state
 func (s *MigrationService) StopTask(id string) error {
 	task, err := s.taskRepo.GetByID(id)
 	if err != nil {
@@ -364,13 +386,12 @@ func (s *MigrationService) StopTask(id string) error {
 		return fmt.Errorf("cannot stop task in terminal state: %s", currentState)
 	}
 
-	// If task is paused, it's already stopped
-	if currentState == model.StatePaused {
-		return nil
-	}
+	// Stop the task and transition to Completed state
+	// Remove from task manager to stop execution
+	s.taskManager.RemoveTask(id)
 
-	// Pause the task to stop it
-	return s.PauseTask(id)
+	// Update state to Completed
+	return s.taskRepo.UpdateState(id, model.StateCompleted, "task stopped by user")
 }
 
 // CancelTask cancels a task
@@ -390,8 +411,9 @@ func (s *MigrationService) CancelTask(id string) error {
 
 // CreateTaskRequest represents a create task request
 type CreateTaskRequest struct {
-	SourceDB    model.DBConfig `json:"source_db"`
-	TargetDB    model.DBConfig `json:"target_db"`
-	Tables      []string       `json:"tables"`
-	TableSuffix string         `json:"table_suffix"`
+	DatabaseType string        `json:"database_type"` // postgresql, mysql, etc.
+	SourceDB     model.DBConfig `json:"source_db"`
+	TargetDB     model.DBConfig `json:"target_db"`
+	Tables       []string      `json:"tables"`
+	TableSuffix  string        `json:"table_suffix"`
 }

@@ -65,7 +65,9 @@ func (s *InitState) Execute(ctx context.Context, task *model.MigrationTask) erro
 
 // Next returns the next state
 func (s *InitState) Next() State {
-	return NewCreatingTablesState()
+	// Init state transitions to Connect state when /:task_id/start is called
+	// This is controlled externally, so return nil here
+	return nil
 }
 
 // CanTransition returns whether the state can transition

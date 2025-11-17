@@ -9,10 +9,10 @@ import (
 // SetupRoutes sets up routes
 func SetupRoutes(router *gin.Engine, migrationService *service.MigrationService) {
 	// New API routes (according to specification)
-	rdscheduler := router.Group("/rdscheduler/api")
+	dts := router.Group("/dts/api")
 	{
 		taskHandler := handler.NewTaskHandler(migrationService)
-		tasks := rdscheduler.Group("/tasks")
+		tasks := dts.Group("/tasks")
 		{
 			tasks.POST("", taskHandler.CreateTask)                      // Create and start data synchronization task
 			tasks.GET("/:task_id/status", taskHandler.GetTaskStatus)   // Query synchronization task status

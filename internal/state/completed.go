@@ -20,7 +20,18 @@ func NewCompletedState() *CompletedState {
 
 // Execute executes the completed state logic
 func (s *CompletedState) Execute(ctx context.Context, task *model.MigrationTask) error {
-	// Completed state does not need to perform any operations
+	// Completed state: clean up resources and close connections
+	// 1. Clean up replication resources (slots, publications)
+	// 2. Remove read-only mode from source database (if set)
+	// 3. Close all database connections
+
+	// Close all connections
+	if err := task.CloseAllConnections(); err != nil {
+		// Log error but don't fail the state
+		// TODO: Use proper logger
+		_ = err
+	}
+
 	return nil
 }
 

@@ -60,7 +60,7 @@ ALTER SYSTEM SET wal_level = logical;
 ### 方式 2: 使用 curl
 
 ```bash
-curl -X POST http://localhost:8080/rdscheduler/api/tasks \
+curl -X POST http://localhost:8080/dts/api/tasks \
   -H "Content-Type: application/json" \
   -d '{
     "task_id": "test-task-001",
@@ -86,19 +86,19 @@ curl -X POST http://localhost:8080/rdscheduler/api/tasks \
 ## 查询任务状态
 
 ```bash
-curl -X GET http://localhost:8080/rdscheduler/api/tasks/test-task-001 | jq
+curl -X GET http://localhost:8080/dts/api/tasks/test-task-001 | jq
 ```
 
 ## 触发切流
 
 ```bash
-curl -X POST http://localhost:8080/rdscheduler/api/tasks/test-task-001/switch | jq
+curl -X POST http://localhost:8080/dts/api/tasks/test-task-001/switch | jq
 ```
 
 ## 删除任务
 
 ```bash
-curl -X DELETE http://localhost:8080/rdscheduler/api/tasks/test-task-001 | jq
+curl -X DELETE http://localhost:8080/dts/api/tasks/test-task-001 | jq
 ```
 
 ## 常见问题
@@ -182,12 +182,12 @@ curl http://localhost:8080/api/v1/health
 
 3. **监控任务状态**
    ```bash
-   watch -n 2 'curl -s http://localhost:8080/rdscheduler/api/tasks/test-task-001 | jq'
+   watch -n 2 'curl -s http://localhost:8080/dts/api/tasks/test-task-001 | jq'
    ```
 
 4. **触发切流**（当数据同步完成后）
    ```bash
-   curl -X POST http://localhost:8080/rdscheduler/api/tasks/test-task-001/switch
+   curl -X POST http://localhost:8080/dts/api/tasks/test-task-001/switch
    ```
 
 5. **验证数据**
@@ -196,6 +196,6 @@ curl http://localhost:8080/api/v1/health
 
 6. **清理任务**
    ```bash
-   curl -X DELETE http://localhost:8080/rdscheduler/api/tasks/test-task-001
+   curl -X DELETE http://localhost:8080/dts/api/tasks/test-task-001
    ```
 

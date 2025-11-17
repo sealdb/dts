@@ -2,7 +2,7 @@
 
 # 创建测试任务的脚本
 
-BASE_URL="http://localhost:8080/rdscheduler/api"
+BASE_URL="http://localhost:8080/dts/api"
 TASK_ID="test-task-$(date +%s)"
 
 SOURCE_HOST="127.0.0.1"
