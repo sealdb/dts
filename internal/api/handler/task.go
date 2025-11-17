@@ -279,21 +279,88 @@ type DeleteTaskResponse struct {
 	Message string `json:"message"` // Error description
 }
 
-// DeleteTask ends a task
-// DELETE /rdscheduler/api/tasks/{task_id}
-func (h *TaskHandler) DeleteTask(c *gin.Context) {
+// StartTask starts a task
+// POST /rdscheduler/api/tasks/{task_id}/start
+func (h *TaskHandler) StartTask(c *gin.Context) {
 	taskID := c.Param("task_id")
 
-	// Cancel task
-	if err := h.service.CancelTask(taskID); err != nil {
-		c.JSON(http.StatusInternalServerError, DeleteTaskResponse{
+	if err := h.service.StartTask(c.Request.Context(), taskID); err != nil {
+		c.JSON(http.StatusInternalServerError, SwitchTaskResponse{
 			State:   "ERROR",
-			Message: "Failed to cancel task: " + err.Error(),
+			Message: "Failed to start task: " + err.Error(),
 		})
 		return
 	}
 
-	// Delete task
+	c.JSON(http.StatusOK, SwitchTaskResponse{
+		State:   "OK",
+		Message: "Task started successfully",
+	})
+}
+
+// StopTask stops a task (task remains, just stops running)
+// POST /rdscheduler/api/tasks/{task_id}/stop
+func (h *TaskHandler) StopTask(c *gin.Context) {
+	taskID := c.Param("task_id")
+
+	if err := h.service.StopTask(taskID); err != nil {
+		c.JSON(http.StatusInternalServerError, SwitchTaskResponse{
+			State:   "ERROR",
+			Message: "Failed to stop task: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, SwitchTaskResponse{
+		State:   "OK",
+		Message: "Task stopped successfully",
+	})
+}
+
+// PauseTask pauses a task
+// POST /rdscheduler/api/tasks/{task_id}/pause
+func (h *TaskHandler) PauseTask(c *gin.Context) {
+	taskID := c.Param("task_id")
+
+	if err := h.service.PauseTask(taskID); err != nil {
+		c.JSON(http.StatusInternalServerError, SwitchTaskResponse{
+			State:   "ERROR",
+			Message: "Failed to pause task: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, SwitchTaskResponse{
+		State:   "OK",
+		Message: "Task paused successfully",
+	})
+}
+
+// ResumeTask resumes a task
+// POST /rdscheduler/api/tasks/{task_id}/resume
+func (h *TaskHandler) ResumeTask(c *gin.Context) {
+	taskID := c.Param("task_id")
+
+	if err := h.service.ResumeTask(c.Request.Context(), taskID); err != nil {
+		c.JSON(http.StatusInternalServerError, SwitchTaskResponse{
+			State:   "ERROR",
+			Message: "Failed to resume task: " + err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, SwitchTaskResponse{
+		State:   "OK",
+		Message: "Task resumed successfully",
+	})
+}
+
+// DeleteTask deletes a task
+// DELETE /rdscheduler/api/tasks/{task_id}
+func (h *TaskHandler) DeleteTask(c *gin.Context) {
+	taskID := c.Param("task_id")
+
+	// Delete task (this will also cancel it if running)
 	if err := h.service.DeleteTask(taskID); err != nil {
 		c.JSON(http.StatusInternalServerError, DeleteTaskResponse{
 			State:   "ERROR",

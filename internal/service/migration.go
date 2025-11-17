@@ -352,6 +352,27 @@ func (s *MigrationService) TriggerSwitchover(ctx context.Context, id string) err
 	return fmt.Errorf("task is not in a state that allows switchover: %s", task.State)
 }
 
+// StopTask stops a task (task remains, just stops running)
+func (s *MigrationService) StopTask(id string) error {
+	task, err := s.taskRepo.GetByID(id)
+	if err != nil {
+		return err
+	}
+
+	currentState := model.StateType(task.State)
+	if currentState.IsTerminal() {
+		return fmt.Errorf("cannot stop task in terminal state: %s", currentState)
+	}
+
+	// If task is paused, it's already stopped
+	if currentState == model.StatePaused {
+		return nil
+	}
+
+	// Pause the task to stop it
+	return s.PauseTask(id)
+}
+
 // CancelTask cancels a task
 func (s *MigrationService) CancelTask(id string) error {
 	task, err := s.taskRepo.GetByID(id)

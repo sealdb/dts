@@ -66,12 +66,12 @@ func main() {
 		log.WithError(err).Fatal("Failed to connect to metadata database")
 	}
 
-	// Auto migrate table structure
-	log.Info("Running database migrations")
+	// Auto migrate table structure (ensure tables exist)
+	log.Info("Initializing database schema")
 	if err := db.AutoMigrate(&model.MigrationTask{}); err != nil {
-		log.WithError(err).Fatal("Failed to migrate database")
+		log.WithError(err).Fatal("Failed to initialize database schema")
 	}
-	log.Info("Database migrations completed")
+	log.Info("Database schema initialized")
 
 	// Create service
 	migrationService := service.NewMigrationService(db)
